@@ -475,61 +475,35 @@ export default function App() {
   // Supabase Data Fetching
   useEffect(() => {
     async function loadData() {
-      // 1. Carregar Preço do Diesel (o mais recente)
-      const { data: dieselData } = await supabase.from('diesel_prices').select('*').order('updated_at', { ascending: false }).limit(1);
-      if (dieselData && dieselData.length > 0) {
-        setDieselPrice(dieselData[0] as any);
-      }
+      // Carregar Equipamentos
+      const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
+      if (eqData) setEquipments(eqData as any);
 
-      // 2. Carregar Equipamentos
-      const { data: eqData } = await supabase.from('equipamentos').select('*').order('equipment', { ascending: true });
-      if (eqData) {
-        const mappedEq = eqData.map((e: any) => ({
-          ...e,
-          ccNovo: e.cc_novo || [],
-          areaLotacao: e.area_lotacao
+      // Carregar Usuários (se a tabela existir)
+      const { data: uData } = await supabase.from('users').select('*');
+      if (uData && uData.length > 0) {
+        // Mapear para o formato local
+        const mappedUsers = uData.map((u: any) => ({
+          id: u.id,
+          username: u.username,
+          password: u.password,
+          role: u.role,
+          status: u.status || 'pending',
+          name: u.name,
+          email: u.email,
+          funcao: u.funcao,
+          avatar: u.avatar,
+          createdAt: u.created_at
         }));
-        setEquipments(mappedEq as any);
+        setUsers(mappedUsers);
       }
 
-      // 3. Carregar Usuários
-      const { data: uData } = await supabase.from('users').select('*').order('name', { ascending: true });
-      if (uData) {
-        setUsers(uData.map(mapUserFromDb));
-      }
-
-      // 4. Carregar Orçamentos
-      const { data: budgetData } = await supabase.from('budgets').select('*').order('diretoria', { ascending: true });
-      if (budgetData) {
-        const mappedBudgets = budgetData.map((b: any) => ({
-          ...b,
-          dataInicio: b.data_inicio,
-          dataFim: b.data_fim
-        }));
-        setBudgets(mappedBudgets as any);
-      }
-
-      // 5. Carregar Rateios
-      const { data: rateioData } = await supabase.from('rateios').select('*').order('equipment', { ascending: true });
-      if (rateioData) {
-        const mappedRateios = rateioData.map((r: any) => ({
-          ...r,
-          equipmentId: r.equipment_id,
-          items: typeof r.items === 'string' ? JSON.parse(r.items) : r.items
-        }));
-        setRateios(mappedRateios as any);
-      }
-
-      // 6. Carregar Abastecimentos
+      // Carregar Abastecimentos
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
       if (absData) {
         const mappedAbs = absData.map((a: any) => ({
-          ...a,
-          ccNovo: a.cc_novo,
-          areaLotacao: a.area_lotacao,
-          createdBy: a.created_by,
-          createdAt: a.created_at,
-          rateioInfo: typeof a.rateio_info === 'string' ? JSON.parse(a.rateio_info) : a.rateio_info
+            ...a,
+            rateioInfo: a.rateio_info ? JSON.parse(a.rateio_info) : undefined
         }));
         setAbastecimentos(mappedAbs as any);
       }
@@ -659,7 +633,7 @@ export default function App() {
   };
 
   // Register handler
-  const handleRegister = async () => {
+  const handleRegister = () => {
     if (!regUsername || !regPassword || !regName || !regEmail) {
       addNotification('error', 'Preencha todos os campos');
       return;
@@ -678,30 +652,23 @@ export default function App() {
       addNotification('error', 'E-mail já cadastrado');
       return;
     }
-
-    const newUser = {
+    const newUser: User = {
+      id: Date.now(),
       username: cleanText(regUsername),
       password: regPassword,
       role: regRole,
       status: 'pending',
       name: cleanText(regName),
       email: emailNormalizado,
-      created_at: new Date().toISOString()
+      createdAt: new Date().toISOString()
     };
-
-    const { data, error } = await supabase.from('users').insert([newUser]).select();
-
-    if (data && !error) {
-      setUsers(prev => [...prev, mapUserFromDb(data[0])]);
-      addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador.');
-      setShowRegister(false);
-      setRegUsername('');
-      setRegPassword('');
-      setRegName('');
-      setRegEmail('');
-    } else {
-      addNotification('error', 'Erro ao realizar cadastro no banco.');
-    }
+    setUsers(prev => [...prev, newUser]);
+    addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador. O e-mail poderá ser usado para recuperação de senha.');
+    setShowRegister(false);
+    setRegUsername('');
+    setRegPassword('');
+    setRegName('');
+    setRegEmail('');
   };
 
   // Forgot password handlers
@@ -805,17 +772,12 @@ export default function App() {
   };
 
   // Approve/Reject user
-  const handleUserApproval = async (userId: number, status: UserStatus) => {
-    const { error } = await supabase.from('users').update({ status }).eq('id', userId);
-    if (!error) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
-      addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
-    } else {
-      addNotification('error', 'Erro ao atualizar status do usuário no banco.');
-    }
+  const handleUserApproval = (userId: number, status: UserStatus) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+    addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleDeleteUser = (userId: number) => {
     const user = users.find(u => u.id === userId);
     if (!user) return;
     if (user.username === 'admin' || user.name === 'Administrador Principal') {
@@ -824,13 +786,8 @@ export default function App() {
     }
     if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) return;
 
-    const { error } = await supabase.from('users').delete().eq('id', userId);
-    if (!error) {
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      addNotification('success', 'Usuário excluído com sucesso!');
-    } else {
-      addNotification('error', 'Erro ao excluir usuário no banco.');
-    }
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    addNotification('success', 'Usuário excluído com sucesso!');
   };
 
   // Logout
@@ -871,102 +828,65 @@ export default function App() {
     }
   };
 
-  const handleUpdateEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
+  const handleUpdateEquipment = (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
     if (!editingEquipment) return;
 
-    const updatedData = {
+    const updatedEquipment: Equipment = {
+      ...editingEquipment,
+      ...equipment,
       equipment: cleanText(equipment.equipment),
       plate: cleanText(equipment.plate),
-      cc_novo: equipment.ccNovo.map(cleanText).filter(Boolean),
+      ccNovo: equipment.ccNovo.map(cleanText).filter(Boolean),
       gerencia: cleanText(equipment.gerencia),
-      area_lotacao: cleanText(equipment.areaLotacao),
+      areaLotacao: cleanText(equipment.areaLotacao),
       area: cleanText(equipment.area),
       fornecedor: cleanText(equipment.fornecedor),
     };
 
-    const { error } = await supabase.from('equipamentos').update(updatedData).eq('id', editingEquipment.id);
-
-    if (!error) {
-      setEquipments(prev => prev.map(item => item.id === editingEquipment.id ? { ...item, ...updatedData, ccNovo: updatedData.cc_novo, areaLotacao: updatedData.area_lotacao } : item));
-      setEditingEquipment(null);
-      addNotification('success', 'Equipamento atualizado no banco!');
-    } else {
-      addNotification('error', 'Erro ao atualizar equipamento no banco.');
-    }
+    setEquipments(prev => prev.map(item => item.id === editingEquipment.id ? updatedEquipment : item));
+    setEditingEquipment(null);
+    addNotification('success', 'Equipamento atualizado com sucesso!');
   };
 
-  const handleDeleteEquipment = async (equipmentId: number) => {
+  const handleDeleteEquipment = (equipmentId: number) => {
     if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
-    
-    const { error } = await supabase.from('equipamentos').delete().eq('id', equipmentId);
-
-    if (!error) {
-      setEquipments(prev => prev.filter(item => item.id !== equipmentId));
-      setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
-      if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
-      addNotification('success', 'Equipamento excluído do banco!');
-    } else {
-      addNotification('error', 'Erro ao excluir equipamento do banco.');
-    }
+    setEquipments(prev => prev.filter(item => item.id !== equipmentId));
+    setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
+    if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
+    addNotification('success', 'Equipamento excluído com sucesso!');
   };
 
   // Add rateio
-  const handleAddRateio = async (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
-    const newRateioData = {
-      equipment_id: rateio.equipmentId,
+  const handleAddRateio = (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
+    const newRateio: Rateio = {
+      ...rateio,
       equipment: cleanText(rateio.equipment),
       description: cleanText(rateio.description),
-      items: JSON.stringify(rateio.items.map((item) => ({
+      items: rateio.items.map((item) => ({
         ...item,
         gerencia: cleanText(item.gerencia),
         ccNovo: cleanText(item.ccNovo),
         description: cleanText(item.description),
-      }))),
-      created_at: new Date().toISOString()
+      })),
+      id: Date.now(),
+      createdAt: new Date().toISOString()
     };
-
-    const { data, error } = await supabase.from('rateios').insert([newRateioData]).select();
-
-    if (data && !error) {
-      const dbRateio = data[0];
-      const localRateio = {
-        ...dbRateio,
-        equipmentId: dbRateio.equipment_id,
-        items: JSON.parse(dbRateio.items)
-      };
-      setRateios(prev => [...prev, localRateio]);
-      addNotification('success', 'Rateio salvo no banco!');
-    } else {
-      addNotification('error', 'Erro ao salvar rateio no banco.');
-    }
+    setRateios(prev => [...prev, newRateio]);
+    addNotification('success', 'Rateio cadastrado com sucesso!');
   };
 
   // Add budget
-  const handleAddBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
-    const newBudgetData = {
+  const handleAddBudget = (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
+    const newBudget: Budget = {
+      ...budget,
       diretoria: cleanText(budget.diretoria),
       periodo: cleanText(budget.periodo),
-      orcamento: budget.orcamento,
+      id: Date.now(),
       realizado: 0,
-      data_inicio: budget.dataInicio,
-      data_fim: budget.dataFim,
-      created_at: new Date().toISOString()
+      createdAt: new Date().toISOString()
     };
-
-    const { data, error } = await supabase.from('budgets').insert([newBudgetData]).select();
-
-    if (data && !error) {
-      const dbBudget = data[0];
-      const localBudget = {
-        ...dbBudget,
-        dataInicio: dbBudget.data_inicio,
-        dataFim: dbBudget.data_fim
-      };
-      setBudgets(prev => [...prev, localBudget]);
-      addNotification('success', 'Orçamento salvo no banco!');
-    } else {
-      addNotification('error', 'Erro ao salvar orçamento no banco.');
-    }
+    setBudgets(prev => [...prev, newBudget]);
+    addNotification('success', 'Orçamento cadastrado! Dashboard atualizado automaticamente.');
   };
 
   // Add abastecimento
@@ -1027,37 +947,33 @@ export default function App() {
   };
 
   // Update diesel price
-  const handleUpdateDieselPrice = async () => {
+  const handleUpdateDieselPrice = () => {
     const price = parseFloat(newDieselPrice);
     if (isNaN(price) || price <= 0) {
       addNotification('error', 'Preço inválido');
       return;
     }
 
-    const dbDiesel = {
+    const newDiesel = {
+      id: 1,
       price,
-      updated_by: currentUser?.username || 'unknown',
-      updated_at: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser?.username || 'unknown'
     };
 
-    const { data, error } = await supabase.from('diesel_prices').insert([dbDiesel]).select();
+    setDieselPrice(newDiesel);
 
-    if (data && !error) {
-      setDieselPrice(data[0] as any);
+    // Recalcula o valor de todos os abastecimentos com o novo preço
+    setAbastecimentos(prev => prev.map(a => ({
+      ...a,
+      valor: a.litros * price
+    })));
 
-      // Recalcula o valor de todos os abastecimentos com o novo preço
-      // Em um sistema real pesado, isso poderia ser feito via cron ou trigger no banco.
-      // Aqui mantemos local para resposta instantânea no dashboard do usuário.
-      setAbastecimentos(prev => prev.map(a => ({
-        ...a,
-        valor: a.litros * price
-      })));
+    // O Orçado vs Realizado e os KPIs do dashboard já usam o dieselPrice.price 
+    // ou o a.valor recalculado acima, então a atualização será automática.
 
-      addNotification('success', `Preço ${formatCurrency(price)} salvo no banco! Dashboard recalculado.`);
-      setNewDieselPrice('');
-    } else {
-      addNotification('error', 'Erro ao salvar novo preço no banco.');
-    }
+    addNotification('success', `Preço atualizado para ${formatCurrency(price)}! Dashboard recalculado.`);
+    setNewDieselPrice('');
   };
 
   // Import Excel
@@ -1165,39 +1081,91 @@ export default function App() {
 
     addNotification('info', 'Salvando registros no banco...');
 
-    const dbRecords = importPreview.records.map(a => ({
-      cc_novo: a.ccNovo,
-      diretoria: a.diretoria,
-      gerencia: a.gerencia,
-      area_lotacao: a.areaLotacao,
-      fornecedor: a.fornecedor,
-      equipamento: a.equipamento,
-      area: a.area,
-      semana: a.semana,
-      data: a.data,
-      litros: a.litros,
-      valor: a.valor,
-      observacoes: a.observacoes,
-      rateio_info: a.rateioInfo ? JSON.stringify(a.rateioInfo) : null,
-      created_by: a.createdBy,
-      created_at: new Date().toISOString()
-    }));
+    const newAbastecimentos = importPreview.records;
 
-    const { data, error } = await supabase.from('abastecimentos').insert(dbRecords).select();
+    try {
+      // Mapear para formato do banco - inserir um por um para evitar erro em lote
+      const insertedRecords: any[] = [];
 
-    if (data && !error) {
-      const mappedNew = data.map((a: any) => ({
-        ...a,
-        ccNovo: a.cc_novo,
-        areaLotacao: a.area_lotacao,
-        createdBy: a.created_by,
-        createdAt: a.created_at,
-        rateioInfo: a.rateio_info ? JSON.parse(a.rateio_info) : undefined
-      }));
+      for (let i = 0; i < newAbastecimentos.length; i++) {
+        const a = newAbastecimentos[i];
+        
+        const recordToInsert: any = {
+          cc_novo: String(a.ccNovo || '').trim(),
+          diretoria: String(a.diretoria || '').trim(),
+          gerencia: String(a.gerencia || '').trim(),
+          area_lotacao: String(a.areaLotacao || '').trim(),
+          fornecedor: String(a.fornecedor || '').trim(),
+          equipamento: String(a.equipamento || '').trim(),
+          area: String(a.area || '').trim(),
+          semana: String(a.semana || '').trim(),
+          data: String(a.data || '').trim(),
+          litros: Number(a.litros) || 0,
+          valor: Number(a.valor) || 0,
+          created_by: String(a.createdBy || '').trim(),
+          created_at: a.createdAt || new Date().toISOString()
+        };
 
-      setAbastecimentos((prev) => [...mappedNew, ...prev]);
+        // Adicionar opcionais apenas se existirem
+        if (a.observacoes) recordToInsert.observacoes = String(a.observacoes).trim();
+        if (a.rateioInfo) recordToInsert.rateio_info = JSON.stringify(a.rateioInfo);
 
-      const realizadoPorDiretoria = mappedNew.reduce<Record<string, number>>((acc, item) => {
+        const { data, error } = await supabase
+          .from('abastecimentos')
+          .insert([recordToInsert])
+          .select();
+
+        if (error) {
+          console.error(`Erro no registro ${i + 1}:`, error, recordToInsert);
+          // Continua tentando os próximos
+          continue;
+        }
+
+        if (data && data[0]) {
+          insertedRecords.push(data[0]);
+        }
+      }
+
+      if (insertedRecords.length === 0) {
+        addNotification('error', 'Nenhum registro foi salvo. Verifique o console (F12) para detalhes.');
+        setImportPreview(null);
+        return;
+      }
+
+      // Mapear dados inseridos para formato local
+      const localRecords = insertedRecords.map((dbRecord: any) => {
+        let rateioInfoParsed;
+        try {
+          rateioInfoParsed = dbRecord.rateio_info ? JSON.parse(dbRecord.rateio_info) : undefined;
+        } catch {
+          rateioInfoParsed = undefined;
+        }
+
+        return {
+          id: dbRecord.id,
+          ccNovo: dbRecord.cc_novo,
+          diretoria: dbRecord.diretoria,
+          gerencia: dbRecord.gerencia,
+          areaLotacao: dbRecord.area_lotacao,
+          fornecedor: dbRecord.fornecedor,
+          equipamento: dbRecord.equipamento,
+          area: dbRecord.area,
+          semana: dbRecord.semana,
+          data: dbRecord.data,
+          litros: Number(dbRecord.litros) || 0,
+          valor: Number(dbRecord.valor) || 0,
+          observacoes: dbRecord.observacoes,
+          rateioInfo: rateioInfoParsed,
+          createdBy: dbRecord.created_by,
+          createdAt: dbRecord.created_at
+        };
+      });
+
+      // Atualizar estado local
+      setAbastecimentos((prev) => [...localRecords, ...prev]);
+
+      // Atualizar orçamentos
+      const realizadoPorDiretoria = localRecords.reduce<Record<string, number>>((acc, item) => {
         if (!item.diretoria) return acc;
         acc[item.diretoria] = (acc[item.diretoria] || 0) + item.valor;
         return acc;
@@ -1210,11 +1178,12 @@ export default function App() {
         })),
       );
 
-      addNotification('success', `${mappedNew.length} registros importados e salvos no banco!`);
+      addNotification('success', `${insertedRecords.length} de ${newAbastecimentos.length} registros importados com sucesso!`);
       setImportPreview(null);
-    } else {
-      addNotification('error', 'Erro ao salvar importação no banco.');
-      console.error(error);
+
+    } catch (err: any) {
+      console.error('Erro geral na importação:', err);
+      addNotification('error', `Erro: ${err.message || 'Verifique o console (F12)'}`);
     }
   };
 
