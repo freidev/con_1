@@ -4508,17 +4508,47 @@ export default function App() {
       addNotification('success', 'Perfil atualizado com sucesso!');
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const dataUrl = evt.target?.result as string;
-        setUsers(prev => prev.map(u => u.id === currentUser?.id ? { ...u, avatar: dataUrl } : u));
-        setCurrentUser(prev => prev ? { ...prev, avatar: dataUrl } : null);
-        addNotification('success', 'Foto de perfil atualizada!');
-      };
-      reader.readAsDataURL(file);
+      if (!file || !currentUser) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      addNotification('info', 'Enviando foto...');
+
+      // 1. Upload para o Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        addNotification('error', 'Erro ao enviar foto para a nuvem.');
+        console.error(uploadError);
+        return;
+      }
+
+      // 2. Pegar URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 3. Atualizar tabela de usuários no banco
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar: publicUrl })
+        .eq('id', currentUser.id);
+
+      if (updateError) {
+        addNotification('error', 'Erro ao salvar link da foto no seu perfil.');
+        return;
+      }
+
+      // 4. Atualizar estado local
+      setUsers(prev => prev.map(u => u.id === currentUser?.id ? { ...u, avatar: publicUrl } : u));
+      setCurrentUser(prev => prev ? { ...prev, avatar: publicUrl } : null);
+      addNotification('success', 'Foto de perfil atualizada e salva na nuvem!');
     };
 
     const handleDeleteProfile = () => {
