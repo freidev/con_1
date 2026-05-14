@@ -4468,11 +4468,18 @@ export default function App() {
     const [deleteConfirm, setDeleteConfirm] = useState('');
     const [showPassFields, setShowPassFields] = useState(false);
 
-    const handleSaveProfile = () => {
+    const handleSaveProfile = async () => {
       if (!editName.trim()) {
         addNotification('error', 'Nome não pode estar vazio');
         return;
       }
+
+      const updatedData: any = {
+        name: cleanText(editName),
+        email: cleanText(editEmail).toLowerCase(),
+        funcao: cleanText(editFuncao)
+      };
+
       if (showPassFields && editPassword) {
         if (editPassword !== confirmPassword) {
           addNotification('error', 'As senhas não coincidem');
@@ -4482,30 +4489,36 @@ export default function App() {
           addNotification('error', 'Senha deve ter no mínimo 4 caracteres');
           return;
         }
+        updatedData.password = editPassword;
       }
-      setUsers(prev => prev.map(u => {
-        if (u.id !== currentUser?.id) return u;
-        return {
-          ...u,
-          name: cleanText(editName),
-          email: cleanText(editEmail),
-          funcao: cleanText(editFuncao),
-          ...(showPassFields && editPassword ? { password: editPassword } : {}),
-        };
-      }));
+
+      addNotification('info', 'Salvando alterações...');
+
+      // 1. Atualizar no Supabase
+      const { error } = await supabase
+        .from('users')
+        .update(updatedData)
+        .eq('id', currentUser?.id);
+
+      if (error) {
+        addNotification('error', 'Erro ao salvar no banco de dados.');
+        console.error(error);
+        return;
+      }
+
+      // 2. Atualizar estado local
+      setUsers(prev => prev.map(u => u.id === currentUser?.id ? { ...u, ...updatedData } : u));
+      
       if (currentUser) {
-        setCurrentUser(prev => prev ? {
-          ...prev,
-          name: cleanText(editName),
-          email: cleanText(editEmail),
-          funcao: cleanText(editFuncao),
-          ...(showPassFields && editPassword ? { password: editPassword } : {}),
-        } : null);
+        const newUser = { ...currentUser, ...updatedData };
+        setCurrentUser(newUser);
+        localStorage.setItem('stratos_current_user', JSON.stringify(newUser));
       }
+
       setShowPassFields(false);
       setEditPassword('');
       setConfirmPassword('');
-      addNotification('success', 'Perfil atualizado com sucesso!');
+      addNotification('success', 'Perfil atualizado e sincronizado com a nuvem!');
     };
 
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
