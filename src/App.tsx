@@ -141,6 +141,62 @@ function mapUserFromDb(user: any): User {
   };
 }
 
+function mapEquipmentFromDb(item: any): Equipment {
+  return {
+    id: Number(item.id),
+    equipment: item.equipment || '',
+    plate: item.plate || '',
+    ccNovo: Array.isArray(item.cc_novo) ? item.cc_novo : [],
+    gerencia: item.gerencia || '',
+    areaLotacao: item.area_lotacao || '',
+    area: item.area || '',
+    fornecedor: item.fornecedor || '',
+    createdAt: item.created_at || new Date().toISOString(),
+  };
+}
+
+function mapAbastecimentoFromDb(item: any): Abastecimento {
+  return {
+    id: Number(item.id),
+    ccNovo: item.cc_novo || '',
+    diretoria: item.diretoria || '',
+    gerencia: item.gerencia || '',
+    areaLotacao: item.area_lotacao || '',
+    fornecedor: item.fornecedor || '',
+    equipamento: item.equipamento || '',
+    area: item.area || '',
+    semana: item.semana || '',
+    data: item.data || '',
+    litros: Number(item.litros) || 0,
+    valor: Number(item.valor) || 0,
+    observacoes: item.observacoes || '',
+    createdBy: item.created_by || '',
+    createdAt: item.created_at || new Date().toISOString(),
+    rateioInfo: item.rateio_info || undefined,
+  };
+}
+
+function abastecimentoToDb(item: Abastecimento) {
+  return {
+    id: item.id,
+    cc_novo: item.ccNovo || '',
+    diretoria: item.diretoria || '',
+    gerencia: item.gerencia || '',
+    area_lotacao: item.areaLotacao || '',
+    fornecedor: item.fornecedor || '',
+    equipamento: item.equipamento || '',
+    area: item.area || '',
+    semana: item.semana || '',
+    data: item.data || '',
+    litros: Number(item.litros) || 0,
+    valor: Number(item.valor) || 0,
+    observacoes: item.observacoes || null,
+    rateio_info: item.rateioInfo || null,
+    created_by: item.createdBy || '',
+    created_at: item.createdAt || new Date().toISOString(),
+  };
+}
+
 function getMonthLabel(value: string) {
   const monthNames = [
     'Janeiro',
@@ -477,35 +533,20 @@ export default function App() {
     async function loadData() {
       // Carregar Equipamentos
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
-      if (eqData) setEquipments(eqData as any);
+      if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
       // Carregar Usuários (se a tabela existir)
       const { data: uData } = await supabase.from('users').select('*');
       if (uData && uData.length > 0) {
         // Mapear para o formato local
-        const mappedUsers = uData.map((u: any) => ({
-          id: u.id,
-          username: u.username,
-          password: u.password,
-          role: u.role,
-          status: u.status || 'pending',
-          name: u.name,
-          email: u.email,
-          funcao: u.funcao,
-          avatar: u.avatar,
-          createdAt: u.created_at
-        }));
+        const mappedUsers = uData.map(mapUserFromDb);
         setUsers(mappedUsers);
       }
 
       // Carregar Abastecimentos
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
       if (absData) {
-        const mappedAbs = absData.map((a: any) => ({
-            ...a,
-            rateioInfo: a.rateio_info ? JSON.parse(a.rateio_info) : undefined
-        }));
-        setAbastecimentos(mappedAbs as any);
+        setAbastecimentos(absData.map(mapAbastecimentoFromDb));
       }
     }
     loadData();
@@ -1084,82 +1125,45 @@ export default function App() {
     const newAbastecimentos = importPreview.records;
 
     try {
-      // Mapear para formato do banco - inserir um por um para evitar erro em lote
+      const recordsToSave = newAbastecimentos.map((item, index) => ({
+        ...item,
+        id: Number(item.id || Date.now() + index),
+        ccNovo: cleanText(item.ccNovo),
+        diretoria: cleanText(item.diretoria),
+        gerencia: cleanText(item.gerencia),
+        areaLotacao: cleanText(item.areaLotacao),
+        fornecedor: cleanText(item.fornecedor),
+        equipamento: cleanText(item.equipamento),
+        area: cleanText(item.area),
+        semana: cleanText(item.semana),
+        data: cleanText(item.data),
+        litros: Number(item.litros) || 0,
+        valor: Number(item.valor) || 0,
+        createdBy: cleanText(item.createdBy || currentUser?.name || 'Importação'),
+        createdAt: item.createdAt || new Date().toISOString(),
+      }));
+
+      const dbRows = recordsToSave.map(abastecimentoToDb);
       const insertedRecords: any[] = [];
+      const chunkSize = 100;
 
-      for (let i = 0; i < newAbastecimentos.length; i++) {
-        const a = newAbastecimentos[i];
-        
-        const recordToInsert: any = {
-          cc_novo: String(a.ccNovo || '').trim(),
-          diretoria: String(a.diretoria || '').trim(),
-          gerencia: String(a.gerencia || '').trim(),
-          area_lotacao: String(a.areaLotacao || '').trim(),
-          fornecedor: String(a.fornecedor || '').trim(),
-          equipamento: String(a.equipamento || '').trim(),
-          area: String(a.area || '').trim(),
-          semana: String(a.semana || '').trim(),
-          data: String(a.data || '').trim(),
-          litros: Number(a.litros) || 0,
-          valor: Number(a.valor) || 0,
-          created_by: String(a.createdBy || '').trim(),
-          created_at: a.createdAt || new Date().toISOString()
-        };
-
-        // Adicionar opcionais apenas se existirem
-        if (a.observacoes) recordToInsert.observacoes = String(a.observacoes).trim();
-        if (a.rateioInfo) recordToInsert.rateio_info = JSON.stringify(a.rateioInfo);
-
+      for (let i = 0; i < dbRows.length; i += chunkSize) {
+        const chunk = dbRows.slice(i, i + chunkSize);
         const { data, error } = await supabase
           .from('abastecimentos')
-          .insert([recordToInsert])
+          .upsert(chunk, { onConflict: 'id' })
           .select();
 
         if (error) {
-          console.error(`Erro no registro ${i + 1}:`, error, recordToInsert);
-          // Continua tentando os próximos
-          continue;
+          console.error('Erro ao salvar lote de importação:', error, { chunkStart: i, chunk });
+          addNotification('error', `${error.message}. Verifique se a tabela abastecimentos tem todas as colunas corretas.`);
+          return;
         }
 
-        if (data && data[0]) {
-          insertedRecords.push(data[0]);
-        }
+        if (data) insertedRecords.push(...data);
       }
 
-      if (insertedRecords.length === 0) {
-        addNotification('error', 'Nenhum registro foi salvo. Verifique o console (F12) para detalhes.');
-        setImportPreview(null);
-        return;
-      }
-
-      // Mapear dados inseridos para formato local
-      const localRecords = insertedRecords.map((dbRecord: any) => {
-        let rateioInfoParsed;
-        try {
-          rateioInfoParsed = dbRecord.rateio_info ? JSON.parse(dbRecord.rateio_info) : undefined;
-        } catch {
-          rateioInfoParsed = undefined;
-        }
-
-        return {
-          id: dbRecord.id,
-          ccNovo: dbRecord.cc_novo,
-          diretoria: dbRecord.diretoria,
-          gerencia: dbRecord.gerencia,
-          areaLotacao: dbRecord.area_lotacao,
-          fornecedor: dbRecord.fornecedor,
-          equipamento: dbRecord.equipamento,
-          area: dbRecord.area,
-          semana: dbRecord.semana,
-          data: dbRecord.data,
-          litros: Number(dbRecord.litros) || 0,
-          valor: Number(dbRecord.valor) || 0,
-          observacoes: dbRecord.observacoes,
-          rateioInfo: rateioInfoParsed,
-          createdBy: dbRecord.created_by,
-          createdAt: dbRecord.created_at
-        };
-      });
+      const localRecords = insertedRecords.map(mapAbastecimentoFromDb);
 
       // Atualizar estado local
       setAbastecimentos((prev) => [...localRecords, ...prev]);
@@ -1178,7 +1182,7 @@ export default function App() {
         })),
       );
 
-      addNotification('success', `${insertedRecords.length} de ${newAbastecimentos.length} registros importados com sucesso!`);
+      addNotification('success', `${insertedRecords.length} registros importados e salvos no Supabase!`);
       setImportPreview(null);
 
     } catch (err: any) {
