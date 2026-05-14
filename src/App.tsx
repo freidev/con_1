@@ -126,6 +126,21 @@ function getRoleLabel(role: string) {
   return 'Operador';
 }
 
+function mapUserFromDb(user: any): User {
+  return {
+    id: user.id,
+    username: user.username,
+    password: user.password,
+    role: user.role,
+    status: user.status || 'pending',
+    name: user.name,
+    email: user.email,
+    funcao: user.funcao,
+    avatar: user.avatar,
+    createdAt: user.created_at || user.createdAt || new Date().toISOString(),
+  };
+}
+
 function getMonthLabel(value: string) {
   const monthNames = [
     'Janeiro',
