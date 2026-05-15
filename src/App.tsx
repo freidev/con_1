@@ -542,13 +542,17 @@ export default function App() {
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-      // Carregar Usuários (se a tabela existir)
-      const { data: uData } = await supabase.from('users').select('*');
-      if (uData && uData.length > 0) {
-        // Mapear para o formato local
-        const mappedUsers = uData.map(mapUserFromDb);
-        setUsers(mappedUsers);
-      }
+     // Carregar Usuários
+const { data: uData, error: usersError } = await supabase
+  .from('users')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+if (usersError) {
+  console.error('Erro ao carregar usuários:', usersError);
+} else if (uData && uData.length > 0) {
+  setUsers(uData.map(mapUserFromDb));
+}
 
       // Carregar Abastecimentos
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
@@ -688,44 +692,87 @@ export default function App() {
   };
 
   // Register handler
-  const handleRegister = () => {
-    if (!regUsername || !regPassword || !regName || !regEmail) {
-      addNotification('error', 'Preencha todos os campos');
-      return;
-    }
+ const handleRegister = async () => {
+  if (!regUsername || !regPassword || !regName || !regEmail) {
+    addNotification('error', 'Preencha todos os campos');
+    return;
+  }
 
-    const emailNormalizado = cleanText(regEmail).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-      addNotification('error', 'Digite um e-mail válido');
-      return;
-    }
-    if (users.find(u => u.username === regUsername)) {
-      addNotification('error', 'Nome de usuário já existe');
-      return;
-    }
-    if (users.find(u => (u.email || '').toLowerCase() === emailNormalizado)) {
-      addNotification('error', 'E-mail já cadastrado');
-      return;
-    }
-    const newUser: User = {
-      id: Date.now(),
-      username: cleanText(regUsername),
-      password: regPassword,
-      role: regRole,
-      status: 'pending',
-      name: cleanText(regName),
-      email: emailNormalizado,
-      createdAt: new Date().toISOString()
-    };
-    setUsers(prev => [...prev, newUser]);
-    addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador. O e-mail poderá ser usado para recuperação de senha.');
-    setShowRegister(false);
-    setRegUsername('');
-    setRegPassword('');
-    setRegName('');
-    setRegEmail('');
+  const usernameNormalizado = cleanText(regUsername);
+  const emailNormalizado = cleanText(regEmail).toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+    addNotification('error', 'Digite um e-mail válido');
+    return;
+  }
+
+  const usernameExistsLocal = users.find(
+    u => u.username.toLowerCase() === usernameNormalizado.toLowerCase()
+  );
+
+  const emailExistsLocal = users.find(
+    u => (u.email || '').toLowerCase() === emailNormalizado
+  );
+
+  if (usernameExistsLocal) {
+    addNotification('error', 'Nome de usuário já existe');
+    return;
+  }
+
+  if (emailExistsLocal) {
+    addNotification('error', 'E-mail já cadastrado');
+    return;
+  }
+
+  addNotification('info', 'Enviando cadastro para aprovação...');
+
+  const userToInsert = {
+    username: usernameNormalizado,
+    password: regPassword,
+    role: regRole,
+    status: 'pending',
+    name: cleanText(regName),
+    email: emailNormalizado,
+    funcao: null,
+    avatar: null,
+    created_at: new Date().toISOString(),
   };
 
+  const { data, error } = await supabase
+    .from('users')
+    .insert([userToInsert])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro ao cadastrar usuário:', error);
+
+    if (error.code === '23505') {
+      addNotification('error', 'Usuário ou e-mail já cadastrado');
+    } else {
+      addNotification('error', `Erro ao cadastrar: ${error.message}`);
+    }
+
+    return;
+  }
+
+  if (data) {
+    const newUser = mapUserFromDb(data);
+    setUsers(prev => [newUser, ...prev]);
+  }
+
+  addNotification(
+    'success',
+    'Cadastro realizado! Aguarde a aprovação do administrador.'
+  );
+
+  setShowRegister(false);
+  setRegUsername('');
+  setRegPassword('');
+  setRegName('');
+  setRegEmail('');
+  setRegRole('operator');
+};
   // Forgot password handlers
   const handleForgotPasswordEmail = () => {
     const emailNormalizado = cleanText(forgotEmail).toLowerCase();
@@ -827,23 +874,55 @@ export default function App() {
   };
 
   // Approve/Reject user
-  const handleUserApproval = (userId: number, status: UserStatus) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
-    addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
-  };
+ const handleUserApproval = async (userId: number, status: UserStatus) => {
+  const { error } = await supabase
+    .from('users')
+    .update({ status })
+    .eq('id', userId);
 
-  const handleDeleteUser = (userId: number) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-    if (user.username === 'admin' || user.name === 'Administrador Principal') {
-      addNotification('warning', 'O Administrador Principal não pode ser excluído.');
-      return;
-    }
-    if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) return;
+  if (error) {
+    console.error('Erro ao atualizar status do usuário:', error);
+    addNotification('error', `Erro ao atualizar usuário: ${error.message}`);
+    return;
+  }
 
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    addNotification('success', 'Usuário excluído com sucesso!');
-  };
+  setUsers(prev =>
+    prev.map(u => (u.id === userId ? { ...u, status } : u))
+  );
+
+  addNotification(
+    'success',
+    `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
+  );
+};
+
+  const handleDeleteUser = async (userId: number) => {
+  const user = users.find(u => u.id === userId);
+  if (!user) return;
+
+  if (user.username === 'admin' || user.name === 'Administrador Principal') {
+    addNotification('warning', 'O Administrador Principal não pode ser excluído.');
+    return;
+  }
+
+  if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Erro ao excluir usuário:', error);
+    addNotification('error', `Erro ao excluir usuário: ${error.message}`);
+    return;
+  }
+
+  setUsers(prev => prev.filter(u => u.id !== userId));
+  addNotification('success', 'Usuário excluído com sucesso!');
+};
 
   // Logout
   const handleLogout = () => {
