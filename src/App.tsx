@@ -662,27 +662,25 @@ if (usersError) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Manter usuário logado e perfil salvo após recarregar a página
-  useEffect(() => {
-    const savedUser = localStorage.getItem('stratos_current_user');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser) as User;
-        setCurrentUser(parsedUser);
-        setCurrentPage(parsedUser.role === 'operator' ? 'preenchimento' : 'dashboard');
-      } catch {
-        localStorage.removeItem('stratos_current_user');
-      }
-    }
-  }, []);
+  // Verificar se há token de recuperação de senha na URL
+useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isResetPassword = urlParams.get('reset_password') === 'true';
+  const type = urlParams.get('type');
 
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('stratos_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('stratos_current_user');
-    }
-  }, [currentUser]);
+  if (isResetPassword || type === 'recovery') {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setShowForgotPassword(true);
+        setForgotStep('reset');
+        setForgotEmail(session.user.email || '');
+        addNotification('info', 'Defina sua nova senha.');
+        // Limpar parâmetros da URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    });
+  }
+}, []);
   
   // Add notification
   const addNotification = (type: Notification['type'], message: string) => {
