@@ -606,14 +606,11 @@ if (usersError) {
   const [regEmail, setRegEmail] = useState('');
   const [regRole, setRegRole] = useState<UserRole>('operator');
 
-  // Forgot password state
+   // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotStep, setForgotStep] = useState<'email' | 'code' | 'reset'>('email');
+  const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotUserId, setForgotUserId] = useState<number | null>(null);
-  const [generatedCode, setGeneratedCode] = useState('');
-  const [enteredCode, setEnteredCode] = useState('');
-  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   
