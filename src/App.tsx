@@ -1989,22 +1989,106 @@ const closeForgotPassword = () => {
         </p>
       </div>
 
-      {/* Forgot Password Modal */}
-      {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-slate-800">
-                {forgotStep === 'email' ? 'Recuperar Senha' : forgotStep === 'code' ? 'Verificar Código' : 'Nova Senha'}
-              </h3>
+    {/* Forgot Password Modal */}
+{showForgotPassword && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-2xl p-8 w-full max-w-md">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-semibold text-slate-800">
+          {forgotStep === 'email' ? 'Recuperar Senha' : 'Nova Senha'}
+        </h3>
+        <button
+          onClick={closeForgotPassword}
+          className="text-slate-400 hover:text-slate-600 transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {forgotStep === 'email' ? (
+        <>
+          <p className="text-sm text-slate-600 mb-5">
+            Digite o e-mail cadastrado na sua conta. Enviaremos um link seguro para você redefinir sua senha.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail cadastrado</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleForgotPasswordEmail}
+                className="flex-1 py-3 px-4 bg-red-800 hover:bg-red-900 text-white font-medium rounded-lg transition-colors"
+              >
+                Enviar Link
+              </button>
               <button
                 onClick={closeForgotPassword}
-                className="text-slate-400 hover:text-slate-600 transition"
+                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                Cancelar
               </button>
             </div>
-
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-5 flex items-start gap-2">
+            <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-green-800">
+              Link verificado! Defina abaixo sua nova senha para <strong>{forgotEmail}</strong>.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nova senha</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 4 caracteres"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder="Repita a nova senha"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleResetPassword}
+                className="flex-1 py-3 px-4 bg-red-800 hover:bg-red-900 text-white font-medium rounded-lg transition-colors"
+              >
+                Redefinir Senha
+              </button>
+              <button
+                onClick={closeForgotPassword}
+                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+)}
             {/* Steps indicator */}
             <div className="flex items-center justify-center gap-2 mb-6">
               {['email', 'code', 'reset'].map((step, idx) => {
