@@ -2384,156 +2384,191 @@ export default function App() {
         </ResponsiveContainer>
       </div>
 
-      {/* Top Equipment */}
+           {/* Top Equipment */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-red-800" />
           Top Equipamentos — Consumo (Litros)
         </h4>
+
         {dashboardData.topEquipamentos.length > 0 ? (
-  <div className="w-full overflow-x-auto">
-    <div className={cn("min-w-[720px]", isMobile && "min-w-[640px]")}>
-      <ResponsiveContainer width="100%" height={isMobile ? 420 : 360}>
-        <BarChart
-          data={dashboardData.topEquipamentos}
-          layout="vertical"
-          barCategoryGap={isMobile ? 10 : 18}
-          margin={{
-            top: 8,
-            right: 20,
-            left: isMobile ? 140 : 28,
-            bottom: 8,
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-          <XAxis
-            type="number"
-            stroke="#64748b"
-            fontSize={10}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => formatCompactNumber(Number(v))}
-          />
-          <YAxis
-            type="category"
-            dataKey="equipamento"
-            tick={(props) => (
-              <CategoryAxisTick
-                {...props}
-                anchorX={-12}
-                textAnchor="end"
-                maxChars={isMobile ? 14 : 24}
-              />
-            )}
-            tickLine={false}
-            axisLine={false}
-            width={isMobile ? 180 : 320}
-          />
-          <Tooltip
-            cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
-            content={({ active, payload }) => {
-              if (!active || !payload?.length) return null;
-              const data = payload[0].payload;
-              return (
-                <div className="max-w-[280px] rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Fuel className="h-4 w-4 text-blue-500" />
-                    <p className="text-sm font-semibold leading-tight text-slate-800">
-                      {data.equipamento}
-                    </p>
-                  </div>
+          <div className="w-full overflow-x-auto">
+            <div className={cn("min-w-[720px]", isMobile && "min-w-[640px]")}>
+              <ResponsiveContainer width="100%" height={isMobile ? 420 : 360}>
+                <BarChart
+                  data={dashboardData.topEquipamentos}
+                  layout="vertical"
+                  barCategoryGap={isMobile ? 10 : 18}
+                  margin={{
+                    top: 8,
+                    right: 20,
+                    left: isMobile ? 140 : 28,
+                    bottom: 8,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
 
-                  {data.gerencias?.length > 0 && (
-                    <div className="mb-3 flex flex-wrap gap-1">
-                      {data.gerencias.map((ger: string) => (
-                        <span
-                          key={ger}
-                          className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700"
-                        >
-                          {ger}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <XAxis
+                    type="number"
+                    stroke="#64748b"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCompactNumber(Number(v))}
+                  />
 
-                  {data.rateioItems ? (
-                    <>
-                      <p className="mb-2 text-xs font-semibold text-slate-500">
-                        Rateio aplicado:
-                      </p>
-                      <div className="space-y-1">
-                        {data.rateioItems.map((item: any, idx: number) => (
-                          <div key={idx} className="flex items-center justify-between text-xs">
-                            <span className="text-slate-600">
-                              {item.ccNovo} ({item.percentage}%)
-                            </span>
-                            <span className="font-semibold text-slate-800">
-                              {formatLiters(item.litros)}
-                            </span>
+                  <YAxis
+                    type="category"
+                    dataKey="equipamento"
+                    tick={(props) => (
+                      <CategoryAxisTick
+                        {...props}
+                        anchorX={-12}
+                        textAnchor="end"
+                        maxChars={isMobile ? 14 : 24}
+                      />
+                    )}
+                    tickLine={false}
+                    axisLine={false}
+                    width={isMobile ? 180 : 320}
+                  />
+
+                  <Tooltip
+                    cursor={{ fill: "rgba(148, 163, 184, 0.15)" }}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const data = payload[0].payload;
+
+                      return (
+                        <div className="max-w-[280px] rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+                          <div className="mb-2 flex items-center gap-2">
+                            <Fuel className="h-4 w-4 text-blue-500" />
+                            <p className="text-sm font-semibold leading-tight text-slate-800">
+                              {data.equipamento}
+                            </p>
                           </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-sm font-bold">
-                        <span>Total</span>
-                        <span>{formatLiters(Number(data.litros))}</span>
-                      </div>
+
+                          {data.gerencias?.length > 0 && (
+                            <div className="mb-3 flex flex-wrap gap-1">
+                              {data.gerencias.map((ger: string) => (
+                                <span
+                                  key={ger}
+                                  className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700"
+                                >
+                                  {ger}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {data.rateioItems ? (
+                            <>
+                              <p className="mb-2 text-xs font-semibold text-slate-500">
+                                Rateio aplicado:
+                              </p>
+
+                              <div className="space-y-1">
+                                {data.rateioItems.map((item: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between text-xs"
+                                  >
+                                    <span className="text-slate-600">
+                                      {item.ccNovo} ({item.percentage}%)
+                                    </span>
+                                    <span className="font-semibold text-slate-800">
+                                      {formatLiters(item.litros)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-sm font-bold">
+                                <span>Total</span>
+                                <span>{formatLiters(Number(data.litros))}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm font-bold text-slate-800">
+                              {formatLiters(Number(data.litros))}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }}
+                  />
+
+                  {dashboardData.maxRateioSegments > 0 ? (
+                    <>
+                      <Bar
+                        dataKey="litrosTotal"
+                        stackId="rateio"
+                        fill="#8B1538"
+                        radius={[0, 10, 10, 0]}
+                        maxBarSize={42}
+                      />
+
+                      {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
+                        const isLast = idx === dashboardData.maxRateioSegments - 1;
+                        const isFirst = idx === 0;
+
+                        return (
+                          <Bar
+                            key={`rateio_${idx}`}
+                            dataKey={`rateio_${idx}`}
+                            stackId="rateio"
+                            fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
+                            radius={
+                              isLast
+                                ? [0, 10, 10, 0]
+                                : isFirst
+                                  ? [10, 0, 0, 10]
+                                  : [0, 0, 0, 0]
+                            }
+                            maxBarSize={42}
+                          />
+                        );
+                      })}
                     </>
                   ) : (
-                    <p className="text-sm font-bold text-slate-800">
-                      {formatLiters(Number(data.litros))}
-                    </p>
+                    <Bar
+                      dataKey="litros"
+                      fill="#8B1538"
+                      name="Litros"
+                      radius={[0, 10, 10, 0]}
+                      maxBarSize={42}
+                    />
                   )}
-                </div>
-              );
-            }}
-          />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        ) : (
+          <p className="text-slate-400 text-center py-8">Nenhum dado disponível</p>
+        )}
 
-          {dashboardData.maxRateioSegments > 0 ? (
-            <>
-              <Bar
-                dataKey="litrosTotal"
-                stackId="rateio"
-                fill="#8B1538"
-                radius={[0, 10, 10, 0]}
-                maxBarSize={42}
+        {dashboardData.maxRateioSegments > 0 && (
+          <div className="mt-4 flex flex-wrap gap-3 justify-center border-t border-slate-100 pt-4">
+            <div className="flex items-center gap-2 text-xs">
+              <span
+                className="h-3 w-3 rounded-sm"
+                style={{ backgroundColor: "#8B1538" }}
               />
-              {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
-                const isLast = idx === dashboardData.maxRateioSegments - 1;
-                const isFirst = idx === 0;
-                return (
-                  <Bar
-                    key={`rateio_${idx}`}
-                    dataKey={`rateio_${idx}`}
-                    stackId="rateio"
-                    fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
-                    radius={
-                      isLast
-                        ? [0, 10, 10, 0]
-                        : isFirst
-                          ? [10, 0, 0, 10]
-                          : [0, 0, 0, 0]
-                    }
-                    maxBarSize={42}
-                  />
-                );
-              })}
-            </>
-          ) : (
-            <Bar
-              dataKey="litros"
-              fill="#8B1538"
-              name="Litros"
-              radius={[0, 10, 10, 0]}
-              maxBarSize={42}
-            />
-          )}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
+              <span className="text-slate-600">Sem rateio</span>
+            </div>
 
-      ) : ( 
-
+            {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => (
+              <div key={`legend-${idx}`} className="flex items-center gap-2 text-xs">
+                <span
+                  className="h-3 w-3 rounded-sm"
+                  style={{ backgroundColor: RATEIO_COLORS[idx % RATEIO_COLORS.length] }}
+                />
+                <span className="text-slate-600">Rateio item {idx + 1}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       {/* Rateio Charts */}
       {dashboardData.rateioData.some(r => r.litros > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
