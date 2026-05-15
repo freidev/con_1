@@ -254,8 +254,8 @@ function splitChartLabel(value: string, maxChars = 24, maxLines = 3) {
   return lines.length > 0 ? lines : [value];
 }
 
-function CategoryAxisTick({ x = 0, y = 0, payload, anchorX = -12, textAnchor = 'end' as 'start' | 'end' | 'middle' }: any) {
-  const lines = splitChartLabel(String(payload?.value || ''));
+function CategoryAxisTick({ x = 0, y = 0, payload, anchorX = -12, textAnchor = 'end' as 'start' | 'end' | 'middle', maxChars = 24 }: any) {
+  const lines = splitChartLabel(String(payload?.value || ''), maxChars);
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -623,6 +623,15 @@ export default function App() {
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [databaseFilters, setDatabaseFilters] = useState<DatabaseFilterState>(createDefaultDatabaseFilters());
   const [editingRecord, setEditingRecord] = useState<Abastecimento | null>(null);
+
+  // Responsividade: detectar se é mobile para ajustar gráficos
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Manter usuário logado e perfil salvo após recarregar a página
   useEffect(() => {
@@ -2180,20 +2189,20 @@ export default function App() {
             <Calendar className="w-4 h-4 text-red-800" />
             Consumo ao Longo do Tempo
           </h4>
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={dashboardData.consumoTempo}>
+          <ResponsiveContainer width="100%" height={isMobile ? 320 : 280}>
+            <AreaChart data={dashboardData.consumoTempo} margin={{ left: -20, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="data" stroke="#64748b" fontSize={12} />
-              <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => formatCompactNumber(Number(v))} />
+              <XAxis dataKey="data" stroke="#64748b" fontSize={10} tickFormatter={(v) => v.split('-').slice(1).reverse().join('/')} />
+              <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => formatCompactNumber(Number(v))} />
               <Tooltip
-                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
                 labelStyle={{ color: '#1e293b' }}
                 formatter={(value: any, name: any) => {
                   if (name === 'Valor (R$)') return [formatCurrency(Number(value || 0)), name];
                   return [formatLiters(Number(value || 0)), name];
                 }}
               />
-              <Legend />
+              {!isMobile && <Legend />}
               <Area type="monotone" dataKey="litros" stroke="#8B1538" fill="#8B153820" name="Litros" />
               <Area type="monotone" dataKey="valor" stroke="#1E3A8A" fill="#1E3A8A20" name="Valor (R$)" />
             </AreaChart>
@@ -2206,10 +2215,20 @@ export default function App() {
             Orçado vs Realizado por Gerência
           </h4>
           {dashboardData.orcamentoRealizado.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={dashboardData.orcamentoRealizado} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+            <ResponsiveContainer width="100%" height={isMobile ? 320 : 280}>
+              <BarChart data={dashboardData.orcamentoRealizado} margin={{ top: 8, right: 8, left: 8, bottom: isMobile ? 40 : 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="gerencia" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis 
+                  dataKey="gerencia" 
+                  stroke="#64748b" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false}
+                  angle={isMobile ? -45 : 0}
+                  textAnchor={isMobile ? "end" : "middle"}
+                  interval={0}
+                  height={isMobile ? 60 : 30}
+                />
                 <YAxis
                   stroke="#64748b"
                   fontSize={12}
@@ -2242,18 +2261,18 @@ export default function App() {
             <Calendar className="w-4 h-4 text-red-800" />
             Consumo por Semana
           </h4>
-          <div className="flex-1 min-h-[340px]">
+          <div className="flex-1 min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dashboardData.consumoSemana} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <BarChart data={dashboardData.consumoSemana} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="semana" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
+                <XAxis dataKey="semana" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px' }}
                   labelStyle={{ color: '#1e293b' }}
                   formatter={(value: any) => [formatLiters(Number(value || 0)), 'Consumo']}
                 />
-                <Bar dataKey="litros" fill="#8B1538" name="Litros" radius={[8, 8, 0, 0]} maxBarSize={72} />
+                <Bar dataKey="litros" fill="#8B1538" name="Litros" radius={[8, 8, 0, 0]} maxBarSize={isMobile ? 40 : 72} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -2337,16 +2356,16 @@ export default function App() {
           <Wrench className="w-4 h-4 text-red-800" />
           Consumo Total de Equipamentos por Gerência
         </h4>
-        <ResponsiveContainer width="100%" height={330}>
-          <BarChart data={dashboardData.consumoGerencia.slice(0, 12)} margin={{ top: 8, right: 8, left: 8, bottom: 18 }}>
+        <ResponsiveContainer width="100%" height={isMobile ? 360 : 330}>
+          <BarChart data={dashboardData.consumoGerencia.slice(0, isMobile ? 8 : 12)} margin={{ top: 8, right: 8, left: 8, bottom: isMobile ? 40 : 18 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
               dataKey="gerencia"
               stroke="#64748b"
-              fontSize={11}
-              angle={0}
-              textAnchor="middle"
-              height={42}
+              fontSize={10}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? "end" : "middle"}
+              height={isMobile ? 80 : 42}
               interval={0}
               tickLine={false}
               axisLine={false}
@@ -2372,22 +2391,22 @@ export default function App() {
           Top Equipamentos — Consumo (Litros)
         </h4>
         {dashboardData.topEquipamentos.length > 0 ? (
-          <ResponsiveContainer width="100%" height={360}>
+          <ResponsiveContainer width="100%" height={isMobile ? 400 : 360}>
             <BarChart
               data={dashboardData.topEquipamentos}
               layout="vertical"
-              barCategoryGap={18}
-              margin={{ top: 8, right: 28, left: 28, bottom: 8 }}
+              barCategoryGap={isMobile ? 12 : 18}
+              margin={{ top: 8, right: 20, left: isMobile ? 0 : 28, bottom: 8 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-              <XAxis type="number" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
+              <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
               <YAxis
                 type="category"
                 dataKey="equipamento"
-                tick={(props) => <CategoryAxisTick {...props} anchorX={-12} textAnchor="end" />}
+                tick={(props) => <CategoryAxisTick {...props} anchorX={isMobile ? 0 : -12} textAnchor={isMobile ? "start" : "end"} maxChars={isMobile ? 16 : 24} />}
                 tickLine={false}
                 axisLine={false}
-                width={320}
+                width={isMobile ? 120 : 320}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
