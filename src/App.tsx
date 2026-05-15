@@ -536,8 +536,33 @@ export default function App() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
   // Supabase Data Fetching
-  useEffect(() => {
-    async function loadData() {
+ useEffect(() => {
+  const channel = supabase
+    .channel('users-realtime')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'users',
+      },
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          setUsers(data.map(mapUserFromDb));
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
       // Carregar Equipamentos
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
