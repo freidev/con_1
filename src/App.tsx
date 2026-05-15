@@ -83,6 +83,21 @@ function deriveWeekLabel(value: string) {
   return dia ? `Sem ${Math.ceil(Number(dia) / 7)}` : '';
 }
 
+function normalizeWeekLabel(value: string | number, dateValue = '') {
+  const raw = cleanText(String(value ?? ''));
+  if (!raw) return deriveWeekLabel(dateValue);
+
+  const normalized = raw.toLowerCase().replace('semana', 'sem').trim();
+  if (/^sem\s*\d+$/i.test(normalized)) {
+    return `Sem ${normalized.replace(/\D/g, '')}`;
+  }
+  if (/^\d+$/.test(normalized)) {
+    return `Sem ${normalized}`;
+  }
+
+  return raw;
+}
+
 function sortTextValues(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' }),
@@ -141,59 +156,51 @@ function mapUserFromDb(user: any): User {
   };
 }
 
-function mapEquipmentFromDb(item: any): Equipment {
+function mapAbastecimentoFromDb(dbRecord: any): Abastecimento {
+  let rateioInfoParsed;
+  try {
+    if (typeof dbRecord.rateio_info === 'string') {
+      rateioInfoParsed = JSON.parse(dbRecord.rateio_info);
+    } else {
+      rateioInfoParsed = dbRecord.rateio_info || undefined;
+    }
+  } catch {
+    rateioInfoParsed = undefined;
+  }
+
+  const data = dbRecord.data ?? '';
+
   return {
-    id: Number(item.id),
-    equipment: item.equipment || '',
-    plate: item.plate || '',
-    ccNovo: Array.isArray(item.cc_novo) ? item.cc_novo : [],
-    gerencia: item.gerencia || '',
-    areaLotacao: item.area_lotacao || '',
-    area: item.area || '',
-    fornecedor: item.fornecedor || '',
-    createdAt: item.created_at || new Date().toISOString(),
+    id: dbRecord.id,
+    ccNovo: dbRecord.cc_novo ?? dbRecord.ccNovo ?? '',
+    diretoria: dbRecord.diretoria ?? '',
+    gerencia: dbRecord.gerencia ?? '',
+    areaLotacao: dbRecord.area_lotacao ?? dbRecord.areaLotacao ?? '',
+    fornecedor: dbRecord.fornecedor ?? '',
+    equipamento: dbRecord.equipamento ?? '',
+    area: dbRecord.area ?? '',
+    semana: normalizeWeekLabel(dbRecord.semana ?? '', data),
+    data,
+    litros: Number(dbRecord.litros) || 0,
+    valor: Number(dbRecord.valor) || 0,
+    observacoes: dbRecord.observacoes ?? '',
+    rateioInfo: rateioInfoParsed,
+    createdBy: dbRecord.created_by ?? dbRecord.createdBy ?? '',
+    createdAt: dbRecord.created_at ?? dbRecord.createdAt ?? new Date().toISOString(),
   };
 }
 
-function mapAbastecimentoFromDb(item: any): Abastecimento {
+function mapEquipmentFromDb(dbRecord: any): Equipment {
   return {
-    id: Number(item.id),
-    ccNovo: item.cc_novo || '',
-    diretoria: item.diretoria || '',
-    gerencia: item.gerencia || '',
-    areaLotacao: item.area_lotacao || '',
-    fornecedor: item.fornecedor || '',
-    equipamento: item.equipamento || '',
-    area: item.area || '',
-    semana: item.semana || '',
-    data: item.data || '',
-    litros: Number(item.litros) || 0,
-    valor: Number(item.valor) || 0,
-    observacoes: item.observacoes || '',
-    createdBy: item.created_by || '',
-    createdAt: item.created_at || new Date().toISOString(),
-    rateioInfo: item.rateio_info || undefined,
-  };
-}
-
-function abastecimentoToDb(item: Abastecimento) {
-  return {
-    id: item.id,
-    cc_novo: item.ccNovo || '',
-    diretoria: item.diretoria || '',
-    gerencia: item.gerencia || '',
-    area_lotacao: item.areaLotacao || '',
-    fornecedor: item.fornecedor || '',
-    equipamento: item.equipamento || '',
-    area: item.area || '',
-    semana: item.semana || '',
-    data: item.data || '',
-    litros: Number(item.litros) || 0,
-    valor: Number(item.valor) || 0,
-    observacoes: item.observacoes || null,
-    rateio_info: item.rateioInfo || null,
-    created_by: item.createdBy || '',
-    created_at: item.createdAt || new Date().toISOString(),
+    id: dbRecord.id,
+    equipment: dbRecord.equipment ?? '',
+    plate: dbRecord.plate ?? '',
+    ccNovo: dbRecord.cc_novo ?? dbRecord.ccNovo ?? [],
+    gerencia: dbRecord.gerencia ?? '',
+    areaLotacao: dbRecord.area_lotacao ?? dbRecord.areaLotacao ?? '',
+    area: dbRecord.area ?? '',
+    fornecedor: dbRecord.fornecedor ?? '',
+    createdAt: dbRecord.created_at ?? dbRecord.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -545,9 +552,7 @@ export default function App() {
 
       // Carregar Abastecimentos
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
-      if (absData) {
-        setAbastecimentos(absData.map(mapAbastecimentoFromDb));
-      }
+      if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
     }
     loadData();
   }, []);
@@ -1081,7 +1086,7 @@ export default function App() {
       const normalizedDate = normalizeDateValue(rawDate);
       const litros = parseFloat(String(getCellValue(row, 'litros')).replace(',', '.')) || 0;
       const semanaInformada = cleanText(String(getCellValue(row, 'semana')));
-      const semana = semanaInformada || deriveWeekLabel(normalizedDate);
+      const semana = normalizeWeekLabel(semanaInformada, normalizedDate);
 
       if (!normalizedDate && !litros) continue;
 
@@ -1125,44 +1130,56 @@ export default function App() {
     const newAbastecimentos = importPreview.records;
 
     try {
-      const recordsToSave = newAbastecimentos.map((item, index) => ({
-        ...item,
-        id: Number(item.id || Date.now() + index),
-        ccNovo: cleanText(item.ccNovo),
-        diretoria: cleanText(item.diretoria),
-        gerencia: cleanText(item.gerencia),
-        areaLotacao: cleanText(item.areaLotacao),
-        fornecedor: cleanText(item.fornecedor),
-        equipamento: cleanText(item.equipamento),
-        area: cleanText(item.area),
-        semana: cleanText(item.semana),
-        data: cleanText(item.data),
-        litros: Number(item.litros) || 0,
-        valor: Number(item.valor) || 0,
-        createdBy: cleanText(item.createdBy || currentUser?.name || 'Importação'),
-        createdAt: item.createdAt || new Date().toISOString(),
+      const recordsToInsert = newAbastecimentos.map((a) => ({
+        cc_novo: String(a.ccNovo || '').trim(),
+        diretoria: String(a.diretoria || '').trim(),
+        gerencia: String(a.gerencia || '').trim(),
+        area_lotacao: String(a.areaLotacao || '').trim(),
+        fornecedor: String(a.fornecedor || '').trim(),
+        equipamento: String(a.equipamento || '').trim(),
+        area: String(a.area || '').trim(),
+        semana: normalizeWeekLabel(a.semana, a.data),
+        data: String(a.data || '').trim(),
+        litros: Number(a.litros) || 0,
+        valor: Number(a.valor) || 0,
+        observacoes: a.observacoes ? String(a.observacoes).trim() : null,
+        rateio_info: a.rateioInfo || null,
+        created_by: String(a.createdBy || '').trim(),
+        created_at: a.createdAt || new Date().toISOString(),
       }));
 
-      const dbRows = recordsToSave.map(abastecimentoToDb);
       const insertedRecords: any[] = [];
       const chunkSize = 100;
 
-      for (let i = 0; i < dbRows.length; i += chunkSize) {
-        const chunk = dbRows.slice(i, i + chunkSize);
+      for (let i = 0; i < recordsToInsert.length; i += chunkSize) {
+        const chunk = recordsToInsert.slice(i, i + chunkSize);
         const { data, error } = await supabase
           .from('abastecimentos')
-          .upsert(chunk, { onConflict: 'id' })
+          .insert(chunk)
           .select();
 
         if (error) {
-          console.error('Erro ao salvar lote de importação:', error, { chunkStart: i, chunk });
-          addNotification('error', `${error.message}. Verifique se a tabela abastecimentos tem todas as colunas corretas.`);
+          console.error('Erro ao salvar lote de importação:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            sample: chunk[0],
+          });
+          addNotification('error', `Erro ao salvar: ${error.message}`);
           return;
         }
 
         if (data) insertedRecords.push(...data);
       }
 
+      if (insertedRecords.length === 0) {
+        addNotification('error', 'Nenhum registro foi salvo. Verifique o console (F12) para detalhes.');
+        setImportPreview(null);
+        return;
+      }
+
+      // Mapear dados inseridos para formato local
       const localRecords = insertedRecords.map(mapAbastecimentoFromDb);
 
       // Atualizar estado local
@@ -1182,7 +1199,7 @@ export default function App() {
         })),
       );
 
-      addNotification('success', `${insertedRecords.length} registros importados e salvos no Supabase!`);
+      addNotification('success', `${insertedRecords.length} de ${newAbastecimentos.length} registros importados com sucesso!`);
       setImportPreview(null);
 
     } catch (err: any) {
@@ -1254,7 +1271,9 @@ export default function App() {
     const semanas = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5'];
     const consumoSemana = semanas.map(semana => ({
       semana,
-      litros: filteredAbastecimentos.filter(a => a.semana === semana).reduce((sum, a) => sum + a.litros, 0)
+      litros: filteredAbastecimentos
+        .filter(a => normalizeWeekLabel(a.semana, a.data) === semana)
+        .reduce((sum, a) => sum + a.litros, 0)
     }));
 
     // Distribution by area
@@ -1389,7 +1408,7 @@ export default function App() {
       equipamentos: sortTextValues(abastecimentosEnriquecidos.map((a) => a.equipamento)),
       dias: sortNumericTextValues(abastecimentosEnriquecidos.map((a) => a.dia)),
       meses: sortNumericTextValues(abastecimentosEnriquecidos.map((a) => a.mes)),
-      semanas: sortTextValues(abastecimentosEnriquecidos.map((a) => a.semana)),
+      semanas: sortTextValues(abastecimentosEnriquecidos.map((a) => normalizeWeekLabel(a.semana, a.data))),
       anos: sortNumericTextValues(abastecimentosEnriquecidos.map((a) => a.ano)),
     }),
     [abastecimentosEnriquecidos],
@@ -4470,12 +4489,15 @@ export default function App() {
           <p className="mb-4 text-sm text-amber-700">O arquivo deve ter as colunas nessa ordem (com ou sem cabeçalho):</p>
 
           <div className="rounded-lg border border-amber-300 bg-white px-4 py-3 font-mono text-xs text-slate-700">
-            CC NOVO | DIRETORIA | GERÊNCIA | ÁREA LOT. | FORNECEDOR | EQUIPAMENTO | ÁREA | DATA | LITROS
+            CC | DIRETORIA | GERÊNCIA | ÁREA LOT. | FORNECEDOR | EQUIPAMENTO | ÁREA | DATA | LITROS
           </div>
 
           <p className="mt-4 text-xs text-amber-700 flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             A data pode estar no formato <strong>DD/MM/AAAA</strong> ou <strong>AAAA-MM-DD</strong>
+          </p>
+          <p className="mt-1 text-xs text-amber-700">
+            A coluna SEMANA não precisa existir no Excel. O sistema calcula automaticamente pela DATA e salva como Sem 1, Sem 2, Sem 3, Sem 4 ou Sem 5.
           </p>
         </div>
         </>
@@ -4509,12 +4531,14 @@ export default function App() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-600">
                     <tr>
-                      <th className="px-3 py-3 text-left">CC Novo</th>
+                      <th className="px-3 py-3 text-left">CC</th>
                       <th className="px-3 py-3 text-left">Diretoria</th>
                       <th className="px-3 py-3 text-left">Gerência</th>
                       <th className="px-3 py-3 text-left">Área Lot.</th>
                       <th className="px-3 py-3 text-left">Fornecedor</th>
                       <th className="px-3 py-3 text-left">Equipamento</th>
+                      <th className="px-3 py-3 text-left">Área</th>
+                      <th className="px-3 py-3 text-left">Semana</th>
                       <th className="px-3 py-3 text-left">Data</th>
                       <th className="px-3 py-3 text-right">Litros</th>
                     </tr>
@@ -4528,6 +4552,8 @@ export default function App() {
                         <td className="px-3 py-2 text-slate-700">{item.areaLotacao}</td>
                         <td className="px-3 py-2 text-slate-700">{item.fornecedor}</td>
                         <td className="px-3 py-2 text-slate-700">{item.equipamento}</td>
+                        <td className="px-3 py-2 text-slate-700">{item.area}</td>
+                        <td className="px-3 py-2 text-slate-700">{item.semana}</td>
                         <td className="px-3 py-2 text-slate-700">{item.data}</td>
                         <td className="px-3 py-2 text-right font-medium text-slate-900">{formatNumber(item.litros, 2)}</td>
                       </tr>
