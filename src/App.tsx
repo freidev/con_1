@@ -799,26 +799,79 @@ if (usersError) {
   setRegRole('operator');
 };
   // Forgot password handlers
-  const handleForgotPasswordEmail = () => {
-    const emailNormalizado = cleanText(forgotEmail).toLowerCase();
-    if (!emailNormalizado) {
-      addNotification('error', 'Digite seu e-mail');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-      addNotification('error', 'Digite um e-mail válido');
-      return;
-    }
-    const user = users.find(u => (u.email || '').toLowerCase() === emailNormalizado);
-    if (!user) {
-      addNotification('error', 'Não encontramos uma conta com este e-mail');
-      return;
-    }
-    if (user.status !== 'approved') {
-      addNotification('warning', 'Esta conta ainda não foi aprovada pelo administrador');
-      return;
-    }
+ // Forgot password handlers
+const handleForgotPasswordEmail = async () => {
+  const emailNormalizado = cleanText(forgotEmail).toLowerCase();
+  if (!emailNormalizado) {
+    addNotification('error', 'Digite seu e-mail');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+    addNotification('error', 'Digite um e-mail válido');
+    return;
+  }
 
+  addNotification('info', 'Enviando link de recuperação...');
+
+  const { error } = await supabase.auth.resetPasswordForEmail(emailNormalizado, {
+    redirectTo: `${window.location.origin}/?reset_password=true`,
+  });
+
+  if (error) {
+    console.error('Erro ao enviar e-mail:', error);
+    addNotification('error', `Erro ao enviar: ${error.message}`);
+    return;
+  }
+
+  addNotification(
+    'success',
+    `Link de recuperação enviado para ${emailNormalizado}. Verifique sua caixa de entrada (e spam).`
+  );
+
+  closeForgotPassword();
+};
+
+const handleResetPassword = async () => {
+  if (!newPassword || !confirmNewPassword) {
+    addNotification('error', 'Preencha os dois campos de senha');
+    return;
+  }
+  if (newPassword.length < 4) {
+    addNotification('error', 'A senha deve ter no mínimo 4 caracteres');
+    return;
+  }
+  if (newPassword !== confirmNewPassword) {
+    addNotification('error', 'As senhas não coincidem');
+    return;
+  }
+
+  addNotification('info', 'Atualizando senha...');
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    console.error('Erro ao atualizar senha:', error);
+    addNotification('error', `Erro ao atualizar: ${error.message}`);
+    return;
+  }
+
+  addNotification('success', 'Senha atualizada com sucesso! Faça login com a nova senha.');
+  closeForgotPassword();
+};
+
+const closeForgotPassword = () => {
+  setShowForgotPassword(false);
+  setForgotStep('email');
+  setForgotEmail('');
+  setForgotUserId(null);
+  setGeneratedCode('');
+  setEnteredCode('');
+  setCodeExpiresAt(null);
+  setNewPassword('');
+  setConfirmNewPassword('');
+};
     // Gera código de 6 dígitos
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 10 * 60 * 1000; // expira em 10 minutos
