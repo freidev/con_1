@@ -2532,6 +2532,8 @@ export default function App() {
     </div>
   </div>
 
+      ) : ( 
+
       {/* Rateio Charts */}
       {dashboardData.rateioData.some(r => r.litros > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
