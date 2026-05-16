@@ -597,7 +597,6 @@ export default function App() {
     };
   }, []);
      
-    loadData();
   }, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
