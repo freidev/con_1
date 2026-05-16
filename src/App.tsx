@@ -555,15 +555,8 @@ export default function App() {
         if (!error && data) {
           setUsers(data.map(mapUserFromDb));
         }
-      }
-    )
-    .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
-      // Carregar Equipamentos
+ // Carregar Equipamentos
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
@@ -583,6 +576,16 @@ if (usersError) {
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
       if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
     }
+        
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+     
     loadData();
   }, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
