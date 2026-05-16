@@ -595,7 +595,6 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
      
   }, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
