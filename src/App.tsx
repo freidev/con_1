@@ -535,77 +535,67 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
-// Supabase Data Fetching
-useEffect(() => {
-  async function loadData() {
-    // Carregar Equipamentos
-    const { data: eqData, error: eqError } = await supabase
-      .from('equipamentos')
-      .select('*')
-      .order('id', { ascending: false });
+  // Supabase Data Fetching
+  useEffect(() => {
+    // 1. Função para carregar dados iniciais
+    async function loadData() {
+      // Carregar Equipamentos
+      const { data: eqData } = await supabase
+        .from('equipamentos')
+        .select('*')
+        .order('id', { ascending: false });
+      if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-    if (eqError) {
-      console.error('Erro ao carregar equipamentos:', eqError);
-    } else if (eqData) {
-      setEquipments(eqData.map(mapEquipmentFromDb));
-    }
-
-    // Carregar Usuários
-    const { data: uData, error: usersError } = await supabase
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (usersError) {
-      console.error('Erro ao carregar usuários:', usersError);
-    } else if (uData && uData.length > 0) {
-      setUsers(uData.map(mapUserFromDb));
-    }
-
-    // Carregar Abastecimentos
-    const { data: absData, error: absError } = await supabase
-      .from('abastecimentos')
-      .select('*')
-      .order('id', { ascending: false });
-
-    if (absError) {
-      console.error('Erro ao carregar abastecimentos:', absError);
-    } else if (absData) {
-      setAbastecimentos(absData.map(mapAbastecimentoFromDb));
-    }
-  }
-
-  loadData();
-
-  // Atualização em tempo real dos usuários
-  const channel = supabase
-    .channel('users-realtime')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'users',
-      },
-      async () => {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('Erro ao atualizar usuários:', error);
-        } else if (data) {
-          setUsers(data.map(mapUserFromDb));
-        }
+      // Carregar Usuários
+      const { data: uData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (usersError) {
+        console.error('Erro ao carregar usuários:', usersError);
+      } else if (uData && uData.length > 0) {
+        setUsers(uData.map(mapUserFromDb));
       }
-    )
-    .subscribe();
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
+      // Carregar Abastecimentos
+      const { data: absData } = await supabase
+        .from('abastecimentos')
+        .select('*')
+        .order('id', { ascending: false });
+      if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
+    }
+
+    // Executa o carregamento inicial
+    loadData();
+
+    // 2. Configuração do Realtime (apenas para Usuários)
+    const channel = supabase
+      .channel('users-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+        },
+        async () => {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && data) {
+            setUsers(data.map(mapUserFromDb));
+          }
+        }
+      )
+      .subscribe();
+
+    // Limpeza ao desmontar o componente
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
      
     loadData();
   }, []);
