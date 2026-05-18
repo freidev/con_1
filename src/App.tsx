@@ -571,7 +571,14 @@ export default function App() {
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-             // Carregar Usuários
+      // Carregar Usuários (se a tabela existir)
+      const { data: uData } = await supabase.from('users').select('*');
+      if (uData && uData.length > 0) {
+        // Mapear para o formato local
+        const mappedUsers = uData.map(mapUserFromDb);
+        setUsers(mappedUsers);       
+      
+      // Carregar Usuários
         const { data: uData, error: usersError } = await supabase
           .from('users')
           .select('*')
