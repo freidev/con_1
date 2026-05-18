@@ -537,65 +537,24 @@ export default function App() {
 
   // Supabase Data Fetching
   useEffect(() => {
-    // 1. Função para carregar dados iniciais
     async function loadData() {
       // Carregar Equipamentos
-      const { data: eqData } = await supabase
-        .from('equipamentos')
-        .select('*')
-        .order('id', { ascending: false });
+      const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-      // Carregar Usuários
-      const { data: uData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (usersError) {
-        console.error('Erro ao carregar usuários:', usersError);
-      } else if (uData && uData.length > 0) {
-        setUsers(uData.map(mapUserFromDb));
+      // Carregar Usuários (se a tabela existir)
+      const { data: uData } = await supabase.from('users').select('*');
+      if (uData && uData.length > 0) {
+        // Mapear para o formato local
+        const mappedUsers = uData.map(mapUserFromDb);
+        setUsers(mappedUsers);
       }
 
       // Carregar Abastecimentos
-      const { data: absData } = await supabase
-        .from('abastecimentos')
-        .select('*')
-        .order('id', { ascending: false });
+      const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
       if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
     }
-
-    // Executa o carregamento inicial
     loadData();
-
-    // 2. Configuração do Realtime (apenas para Usuários)
-    const channel = supabase
-      .channel('users-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'users',
-        },
-        async () => {
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (!error && data) {
-            setUsers(data.map(mapUserFromDb));
-          }
-        }
-      )
-      .subscribe();
-
-    // Limpeza ao desmontar o componente
-    return () => {
-      supabase.removeChannel(channel);
-    };
-     
   }, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
@@ -618,10 +577,16 @@ export default function App() {
   const [regEmail, setRegEmail] = useState('');
   const [regRole, setRegRole] = useState<UserRole>('operator');
 
-   // Forgot password state
+  // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email');
- 
+  const [forgotStep, setForgotStep] = useState<'email' | 'code' | 'reset'>('email');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotUserId, setForgotUserId] = useState<number | null>(null);
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [enteredCode, setEnteredCode] = useState('');
+  const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   
   // Filters
   const [filters, setFilters] = useState<FilterState>(createDefaultDashboardFilters());
@@ -633,10 +598,7 @@ export default function App() {
   
   // Diesel price form
   const [newDieselPrice, setNewDieselPrice] = useState('');
- const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotUserId, setForgotUserId] = useState<number | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+
   // Export state
   const [exportFormat, setExportFormat] = useState<ExportFormatId>('base');
   const [exportFileName, setExportFileName] = useState('controle_abastecimento');
@@ -671,66 +633,28 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Verificar se há token de recuperação de senha na URL
-useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isResetPassword = urlParams.get('reset_password') === 'true';
-  const type = urlParams.get('type');
-
-  if (isResetPassword || type === 'recovery') {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setShowForgotPassword(true);
-        setForgotStep('reset');
-        setForgotEmail(session.user.email || '');
-        addNotification('info', 'Defina sua nova senha.');
-        // Limpar parâmetros da URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+  // Manter usuário logado e perfil salvo após recarregar a página
+  useEffect(() => {
+    const savedUser = localStorage.getItem('stratos_current_user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser) as User;
+        setCurrentUser(parsedUser);
+        setCurrentPage(parsedUser.role === 'operator' ? 'preenchimento' : 'dashboard');
+      } catch {
+        localStorage.removeItem('stratos_current_user');
       }
-    });
-  }
-}, []);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('stratos_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('stratos_current_user');
+    }
+  }, [currentUser]);
   
-     // Manter usuário logado e perfil salvo após recarregar a página
-      useEffect(() => {
-        // Verificar se há token de recuperação de senha na URL
-useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isResetPassword = urlParams.get('reset_password') === 'true';
-  const type = urlParams.get('type');
-
-  if (isResetPassword || type === 'recovery') {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setShowForgotPassword(true);
-        setForgotStep('reset');
-        setForgotEmail(session.user.email || '');
-        addNotification('info', 'Defina sua nova senha.');
-        // Limpar parâmetros da URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    });
-  }
-}, []);
-        const savedUser = localStorage.getItem('stratos_current_user');
-        if (savedUser) {
-          try {
-            const parsedUser = JSON.parse(savedUser) as User;
-            setCurrentUser(parsedUser);
-            setCurrentPage(parsedUser.role === 'operator' ? 'preenchimento' : 'dashboard');
-          } catch {
-            localStorage.removeItem('stratos_current_user');
-          }
-        }
-      }, []);
-    
-      useEffect(() => {
-        if (currentUser) {
-          localStorage.setItem('stratos_current_user', JSON.stringify(currentUser));
-        } else {
-          localStorage.removeItem('stratos_current_user');
-        }
-      }, [currentUser]);
   // Add notification
   const addNotification = (type: Notification['type'], message: string) => {
     const id = Date.now();
@@ -764,162 +688,65 @@ useEffect(() => {
   };
 
   // Register handler
- const handleRegister = async () => {
-  if (!regUsername || !regPassword || !regName || !regEmail) {
-    addNotification('error', 'Preencha todos os campos');
-    return;
-  }
-
-  const usernameNormalizado = cleanText(regUsername);
-  const emailNormalizado = cleanText(regEmail).toLowerCase();
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-    addNotification('error', 'Digite um e-mail válido');
-    return;
-  }
-
-  const usernameExistsLocal = users.find(
-    u => u.username.toLowerCase() === usernameNormalizado.toLowerCase()
-  );
-
-  const emailExistsLocal = users.find(
-    u => (u.email || '').toLowerCase() === emailNormalizado
-  );
-
-  if (usernameExistsLocal) {
-    addNotification('error', 'Nome de usuário já existe');
-    return;
-  }
-
-  if (emailExistsLocal) {
-    addNotification('error', 'E-mail já cadastrado');
-    return;
-  }
-
-  addNotification('info', 'Enviando cadastro para aprovação...');
-
-  const userToInsert = {
-    username: usernameNormalizado,
-    password: regPassword,
-    role: regRole,
-    status: 'pending',
-    name: cleanText(regName),
-    email: emailNormalizado,
-    funcao: null,
-    avatar: null,
-    created_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('users')
-    .insert([userToInsert])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro ao cadastrar usuário:', error);
-
-    if (error.code === '23505') {
-      addNotification('error', 'Usuário ou e-mail já cadastrado');
-    } else {
-      addNotification('error', `Erro ao cadastrar: ${error.message}`);
+  const handleRegister = () => {
+    if (!regUsername || !regPassword || !regName || !regEmail) {
+      addNotification('error', 'Preencha todos os campos');
+      return;
     }
 
-    return;
-  }
-
-  if (data) {
-    const newUser = mapUserFromDb(data);
-    setUsers(prev => [newUser, ...prev]);
-  }
-
-  addNotification(
-    'success',
-    'Cadastro realizado! Aguarde a aprovação do administrador.'
-  );
-
-  setShowRegister(false);
-  setRegUsername('');
-  setRegPassword('');
-  setRegName('');
-  setRegEmail('');
-  setRegRole('operator');
-};
+    const emailNormalizado = cleanText(regEmail).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      addNotification('error', 'Digite um e-mail válido');
+      return;
+    }
+    if (users.find(u => u.username === regUsername)) {
+      addNotification('error', 'Nome de usuário já existe');
+      return;
+    }
+    if (users.find(u => (u.email || '').toLowerCase() === emailNormalizado)) {
+      addNotification('error', 'E-mail já cadastrado');
+      return;
+    }
+    const newUser: User = {
+      id: Date.now(),
+      username: cleanText(regUsername),
+      password: regPassword,
+      role: regRole,
+      status: 'pending',
+      name: cleanText(regName),
+      email: emailNormalizado,
+      createdAt: new Date().toISOString()
+    };
+    setUsers(prev => [...prev, newUser]);
+    addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador. O e-mail poderá ser usado para recuperação de senha.');
+    setShowRegister(false);
+    setRegUsername('');
+    setRegPassword('');
+    setRegName('');
+    setRegEmail('');
+  };
 
   // Forgot password handlers
-const handleForgotPasswordEmail = async () => {
-  const emailNormalizado = cleanText(forgotEmail).toLowerCase();
-  if (!emailNormalizado) {
-    addNotification('error', 'Digite seu e-mail');
-    return;
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-    addNotification('error', 'Digite um e-mail válido');
-    return;
-  }
+  const handleForgotPasswordEmail = () => {
+    const emailNormalizado = cleanText(forgotEmail).toLowerCase();
+    if (!emailNormalizado) {
+      addNotification('error', 'Digite seu e-mail');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      addNotification('error', 'Digite um e-mail válido');
+      return;
+    }
+    const user = users.find(u => (u.email || '').toLowerCase() === emailNormalizado);
+    if (!user) {
+      addNotification('error', 'Não encontramos uma conta com este e-mail');
+      return;
+    }
+    if (user.status !== 'approved') {
+      addNotification('warning', 'Esta conta ainda não foi aprovada pelo administrador');
+      return;
+    }
 
-  addNotification('info', 'Enviando link de recuperação...');
-
-  const { error } = await supabase.auth.resetPasswordForEmail(emailNormalizado, {
-    redirectTo: `${window.location.origin}/?reset_password=true`,
-  });
-
-  if (error) {
-    console.error('Erro ao enviar e-mail:', error);
-    addNotification('error', `Erro ao enviar: ${error.message}`);
-    return;
-  }
-
-  addNotification(
-    'success',
-    `Link de recuperação enviado para ${emailNormalizado}. Verifique sua caixa de entrada (e spam).`
-  );
-
-  closeForgotPassword();
-};
-
-const handleResetPassword = async () => {
-  if (!newPassword || !confirmNewPassword) {
-    addNotification('error', 'Preencha os dois campos de senha');
-    return;
-  }
-  if (newPassword.length < 4) {
-    addNotification('error', 'A senha deve ter no mínimo 4 caracteres');
-    return;
-  }
-  if (newPassword !== confirmNewPassword) {
-    addNotification('error', 'As senhas não coincidem');
-    return;
-  }
-
-  addNotification('info', 'Atualizando senha...');
-
-  const { error } = await supabase.auth.updateUser({
-    password: newPassword,
-  });
-
-  if (error) {
-    console.error('Erro ao atualizar senha:', error);
-    addNotification('error', `Erro ao atualizar: ${error.message}`);
-    return;
-  }
-
-  addNotification('success', 'Senha atualizada com sucesso! Faça login com a nova senha.');
-  closeForgotPassword();
-};
-
-const closeForgotPassword = () => {
-  setShowForgotPassword(false);
-  setForgotStep('email');
-  setForgotEmail('');
-  setForgotUserId(null);
-  setGeneratedCode('');
-  setEnteredCode('');
-  setCodeExpiresAt(null);
-  setNewPassword('');
-  setConfirmNewPassword('');
-};
-  
     // Gera código de 6 dígitos
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 10 * 60 * 1000; // expira em 10 minutos
@@ -1000,55 +827,23 @@ const closeForgotPassword = () => {
   };
 
   // Approve/Reject user
- const handleUserApproval = async (userId: number, status: UserStatus) => {
-  const { error } = await supabase
-    .from('users')
-    .update({ status })
-    .eq('id', userId);
+  const handleUserApproval = (userId: number, status: UserStatus) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+    addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
+  };
 
-  if (error) {
-    console.error('Erro ao atualizar status do usuário:', error);
-    addNotification('error', `Erro ao atualizar usuário: ${error.message}`);
-    return;
-  }
+  const handleDeleteUser = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (user.username === 'admin' || user.name === 'Administrador Principal') {
+      addNotification('warning', 'O Administrador Principal não pode ser excluído.');
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) return;
 
-  setUsers(prev =>
-    prev.map(u => (u.id === userId ? { ...u, status } : u))
-  );
-
-  addNotification(
-    'success',
-    `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
-  );
-};
-
-  const handleDeleteUser = async (userId: number) => {
-  const user = users.find(u => u.id === userId);
-  if (!user) return;
-
-  if (user.username === 'admin' || user.name === 'Administrador Principal') {
-    addNotification('warning', 'O Administrador Principal não pode ser excluído.');
-    return;
-  }
-
-  if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from('users')
-    .delete()
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Erro ao excluir usuário:', error);
-    addNotification('error', `Erro ao excluir usuário: ${error.message}`);
-    return;
-  }
-
-  setUsers(prev => prev.filter(u => u.id !== userId));
-  addNotification('success', 'Usuário excluído com sucesso!');
-};
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    addNotification('success', 'Usuário excluído com sucesso!');
+  };
 
   // Logout
   const handleLogout = () => {
@@ -2040,106 +1835,21 @@ const closeForgotPassword = () => {
       </div>
 
       {/* Forgot Password Modal */}
-{showForgotPassword && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-2xl p-8 w-full max-w-md">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold text-slate-800">
-          {forgotStep === 'email' ? 'Recuperar Senha' : 'Nova Senha'}
-        </h3>
-        <button
-          onClick={closeForgotPassword}
-          className="text-slate-400 hover:text-slate-600 transition"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-slate-800">
+                {forgotStep === 'email' ? 'Recuperar Senha' : forgotStep === 'code' ? 'Verificar Código' : 'Nova Senha'}
+              </h3>
+              <button
+                onClick={closeForgotPassword}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-      {forgotStep === 'email' ? (
-        <>
-          <p className="text-sm text-slate-600 mb-5">
-            Digite o e-mail cadastrado na sua conta. Enviaremos um link seguro para você redefinir sua senha.
-          </p>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail cadastrado</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="email"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="seu@email.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleForgotPasswordEmail}
-                className="flex-1 py-3 px-4 bg-red-800 hover:bg-red-900 text-white font-medium rounded-lg transition-colors"
-              >
-                Enviar Link
-              </button>
-              <button
-                onClick={closeForgotPassword}
-                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-5 flex items-start gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-green-800">
-              Link verificado! Defina abaixo sua nova senha para <strong>{forgotEmail}</strong>.
-            </p>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nova senha</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 4 caracteres"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha</label>
-              <input
-                type="password"
-                value={confirmNewPassword}
-                onChange={(e) => setConfirmNewPassword(e.target.value)}
-                placeholder="Repita a nova senha"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={handleResetPassword}
-                className="flex-1 py-3 px-4 bg-red-800 hover:bg-red-900 text-white font-medium rounded-lg transition-colors"
-              >
-                Redefinir Senha
-              </button>
-              <button
-                onClick={closeForgotPassword}
-                className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  </div>
-)}
-   
             {/* Steps indicator */}
             <div className="flex items-center justify-center gap-2 mb-6">
               {['email', 'code', 'reset'].map((step, idx) => {
@@ -2298,6 +2008,7 @@ const closeForgotPassword = () => {
           </div>
         </div>
       )}
+
       {/* Register Modal */}
       {showRegister && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -2673,179 +2384,113 @@ const closeForgotPassword = () => {
         </ResponsiveContainer>
       </div>
 
-           {/* Top Equipment */}
+      {/* Top Equipment */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-red-800" />
           Top Equipamentos — Consumo (Litros)
         </h4>
-
         {dashboardData.topEquipamentos.length > 0 ? (
-          <div className="w-full overflow-x-auto">
-            <div className={cn("min-w-[720px]", isMobile && "min-w-[640px]")}>
-              <ResponsiveContainer width="100%" height={isMobile ? 420 : 360}>
-                <BarChart
-                  data={dashboardData.topEquipamentos}
-                  layout="vertical"
-                  barCategoryGap={isMobile ? 10 : 18}
-                  margin={{
-                    top: 8,
-                    right: 20,
-                    left: isMobile ? 140 : 28,
-                    bottom: 8,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-
-                  <XAxis
-                    type="number"
-                    stroke="#64748b"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => formatCompactNumber(Number(v))}
-                  />
-
-                  <YAxis
-                    type="category"
-                    dataKey="equipamento"
-                    tick={(props) => (
-                      <CategoryAxisTick
-                        {...props}
-                        anchorX={-12}
-                        textAnchor="end"
-                        maxChars={isMobile ? 14 : 24}
-                      />
-                    )}
-                    tickLine={false}
-                    axisLine={false}
-                    width={isMobile ? 180 : 320}
-                  />
-
-                  <Tooltip
-                    cursor={{ fill: "rgba(148, 163, 184, 0.15)" }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const data = payload[0].payload;
-
-                      return (
-                        <div className="max-w-[280px] rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
-                          <div className="mb-2 flex items-center gap-2">
-                            <Fuel className="h-4 w-4 text-blue-500" />
-                            <p className="text-sm font-semibold leading-tight text-slate-800">
-                              {data.equipamento}
-                            </p>
-                          </div>
-
-                          {data.gerencias?.length > 0 && (
-                            <div className="mb-3 flex flex-wrap gap-1">
-                              {data.gerencias.map((ger: string) => (
-                                <span
-                                  key={ger}
-                                  className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700"
-                                >
-                                  {ger}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {data.rateioItems ? (
-                            <>
-                              <p className="mb-2 text-xs font-semibold text-slate-500">
-                                Rateio aplicado:
-                              </p>
-
-                              <div className="space-y-1">
-                                {data.rateioItems.map((item: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center justify-between text-xs"
-                                  >
-                                    <span className="text-slate-600">
-                                      {item.ccNovo} ({item.percentage}%)
-                                    </span>
-                                    <span className="font-semibold text-slate-800">
-                                      {formatLiters(item.litros)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-sm font-bold">
-                                <span>Total</span>
-                                <span>{formatLiters(Number(data.litros))}</span>
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-sm font-bold text-slate-800">
-                              {formatLiters(Number(data.litros))}
-                            </p>
-                          )}
+          <ResponsiveContainer width="100%" height={isMobile ? 400 : 360}>
+            <BarChart
+              data={dashboardData.topEquipamentos}
+              layout="vertical"
+              barCategoryGap={isMobile ? 12 : 18}
+              margin={{ top: 8, right: 20, left: isMobile ? 0 : 28, bottom: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+              <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
+              <YAxis
+                type="category"
+                dataKey="equipamento"
+                tick={(props) => <CategoryAxisTick {...props} anchorX={isMobile ? 0 : -12} textAnchor={isMobile ? "start" : "end"} maxChars={isMobile ? 16 : 24} />}
+                tickLine={false}
+                axisLine={false}
+                width={isMobile ? 120 : 320}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-xl sm:min-w-[280px]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Fuel className="h-4 w-4 text-blue-500" />
+                        <p className="font-semibold text-slate-800 text-sm leading-tight">{data.equipamento}</p>
+                      </div>
+                      {data.gerencias?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {data.gerencias.map((ger: string) => (
+                            <span key={ger} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{ger}</span>
+                          ))}
                         </div>
-                      );
-                    }}
+                      )}
+                      {data.rateioItems ? (
+                        <>
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Rateio aplicado:</p>
+                          <div className="space-y-1">
+                            {data.rateioItems.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <span className="text-slate-600">{item.ccNovo} ({item.percentage}%)</span>
+                                <span className="font-semibold text-slate-800">{formatLiters(item.litros)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 border-t border-slate-100 pt-2 flex justify-between text-sm font-bold">
+                            <span>Total</span>
+                            <span>{formatLiters(Number(data.litros))}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm font-bold text-slate-800">{formatLiters(Number(data.litros))}</p>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              {/* Barras: se houver rateios, divide em segmentos coloridos */}
+              {dashboardData.maxRateioSegments > 0 ? (
+                <>
+                  {/* Barra de fundo cinza para mostrar total quando não há rateio */}
+                  <Bar
+                    dataKey="litrosTotal"
+                    stackId="rateio"
+                    fill="#8B1538"
+                    radius={[0, 10, 10, 0]}
+                    maxBarSize={42}
                   />
-
-                  {dashboardData.maxRateioSegments > 0 ? (
-                    <>
+                  {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
+                    const isLast = idx === dashboardData.maxRateioSegments - 1;
+                    const isFirst = idx === 0;
+                    return (
                       <Bar
-                        dataKey="litrosTotal"
+                        key={`rateio_${idx}`}
+                        dataKey={`rateio_${idx}`}
                         stackId="rateio"
-                        fill="#8B1538"
-                        radius={[0, 10, 10, 0]}
+                        fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
+                        radius={isLast ? [0, 10, 10, 0] : isFirst ? [10, 0, 0, 10] : [0, 0, 0, 0]}
                         maxBarSize={42}
                       />
-
-                      {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
-                        const isLast = idx === dashboardData.maxRateioSegments - 1;
-                        const isFirst = idx === 0;
-
-                        return (
-                          <Bar
-                            key={`rateio_${idx}`}
-                            dataKey={`rateio_${idx}`}
-                            stackId="rateio"
-                            fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
-                            radius={
-                              isLast
-                                ? [0, 10, 10, 0]
-                                : isFirst
-                                  ? [10, 0, 0, 10]
-                                  : [0, 0, 0, 0]
-                            }
-                            maxBarSize={42}
-                          />
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <Bar
-                      dataKey="litros"
-                      fill="#8B1538"
-                      name="Litros"
-                      radius={[0, 10, 10, 0]}
-                      maxBarSize={42}
-                    />
-                  )}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+                    );
+                  })}
+                </>
+              ) : (
+                <Bar dataKey="litros" fill="#8B1538" name="Litros" radius={[0, 10, 10, 0]} maxBarSize={42} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         ) : (
           <p className="text-slate-400 text-center py-8">Nenhum dado disponível</p>
         )}
 
+        {/* Legenda dos rateios */}
         {dashboardData.maxRateioSegments > 0 && (
           <div className="mt-4 flex flex-wrap gap-3 justify-center border-t border-slate-100 pt-4">
             <div className="flex items-center gap-2 text-xs">
-              <span
-                className="h-3 w-3 rounded-sm"
-                style={{ backgroundColor: "#8B1538" }}
-              />
+              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#8B1538' }} />
               <span className="text-slate-600">Sem rateio</span>
             </div>
-
             {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => (
               <div key={`legend-${idx}`} className="flex items-center gap-2 text-xs">
                 <span
@@ -2858,6 +2503,7 @@ const closeForgotPassword = () => {
           </div>
         )}
       </div>
+
       {/* Rateio Charts */}
       {dashboardData.rateioData.some(r => r.litros > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
