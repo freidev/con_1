@@ -2251,7 +2251,7 @@ const closeForgotPassword = () => {
                     </button>
                   </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
