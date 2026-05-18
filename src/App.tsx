@@ -621,10 +621,7 @@ export default function App() {
    // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotStep, setForgotStep] = useState<'email' | 'reset'>('email');
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotUserId, setForgotUserId] = useState<number | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+ 
   
   // Filters
   const [filters, setFilters] = useState<FilterState>(createDefaultDashboardFilters());
