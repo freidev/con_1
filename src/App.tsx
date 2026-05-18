@@ -633,7 +633,10 @@ export default function App() {
   
   // Diesel price form
   const [newDieselPrice, setNewDieselPrice] = useState('');
-
+ const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotUserId, setForgotUserId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   // Export state
   const [exportFormat, setExportFormat] = useState<ExportFormatId>('base');
   const [exportFileName, setExportFileName] = useState('controle_abastecimento');
@@ -842,7 +845,8 @@ useEffect(() => {
   setRegEmail('');
   setRegRole('operator');
 };
- // Forgot password handlers
+
+  // Forgot password handlers
 const handleForgotPasswordEmail = async () => {
   const emailNormalizado = cleanText(forgotEmail).toLowerCase();
   if (!emailNormalizado) {
@@ -915,6 +919,7 @@ const closeForgotPassword = () => {
   setNewPassword('');
   setConfirmNewPassword('');
 };
+  
     // Gera código de 6 dígitos
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = Date.now() + 10 * 60 * 1000; // expira em 10 minutos
