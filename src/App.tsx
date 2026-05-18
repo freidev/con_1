@@ -542,17 +542,13 @@ export default function App() {
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
       if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-     // Carregar Usuários
-const { data: uData, error: usersError } = await supabase
-  .from('users')
-  .select('*')
-  .order('created_at', { ascending: false });
-
-if (usersError) {
-  console.error('Erro ao carregar usuários:', usersError);
-} else if (uData && uData.length > 0) {
-  setUsers(uData.map(mapUserFromDb));
-}
+      // Carregar Usuários (se a tabela existir)
+      const { data: uData } = await supabase.from('users').select('*');
+      if (uData && uData.length > 0) {
+        // Mapear para o formato local
+        const mappedUsers = uData.map(mapUserFromDb);
+        setUsers(mappedUsers);
+      }
 
       // Carregar Abastecimentos
       const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
@@ -692,87 +688,44 @@ if (usersError) {
   };
 
   // Register handler
- const handleRegister = async () => {
-  if (!regUsername || !regPassword || !regName || !regEmail) {
-    addNotification('error', 'Preencha todos os campos');
-    return;
-  }
-
-  const usernameNormalizado = cleanText(regUsername);
-  const emailNormalizado = cleanText(regEmail).toLowerCase();
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-    addNotification('error', 'Digite um e-mail válido');
-    return;
-  }
-
-  const usernameExistsLocal = users.find(
-    u => u.username.toLowerCase() === usernameNormalizado.toLowerCase()
-  );
-
-  const emailExistsLocal = users.find(
-    u => (u.email || '').toLowerCase() === emailNormalizado
-  );
-
-  if (usernameExistsLocal) {
-    addNotification('error', 'Nome de usuário já existe');
-    return;
-  }
-
-  if (emailExistsLocal) {
-    addNotification('error', 'E-mail já cadastrado');
-    return;
-  }
-
-  addNotification('info', 'Enviando cadastro para aprovação...');
-
-  const userToInsert = {
-    username: usernameNormalizado,
-    password: regPassword,
-    role: regRole,
-    status: 'pending',
-    name: cleanText(regName),
-    email: emailNormalizado,
-    funcao: null,
-    avatar: null,
-    created_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('users')
-    .insert([userToInsert])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro ao cadastrar usuário:', error);
-
-    if (error.code === '23505') {
-      addNotification('error', 'Usuário ou e-mail já cadastrado');
-    } else {
-      addNotification('error', `Erro ao cadastrar: ${error.message}`);
+  const handleRegister = () => {
+    if (!regUsername || !regPassword || !regName || !regEmail) {
+      addNotification('error', 'Preencha todos os campos');
+      return;
     }
 
-    return;
-  }
+    const emailNormalizado = cleanText(regEmail).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      addNotification('error', 'Digite um e-mail válido');
+      return;
+    }
+    if (users.find(u => u.username === regUsername)) {
+      addNotification('error', 'Nome de usuário já existe');
+      return;
+    }
+    if (users.find(u => (u.email || '').toLowerCase() === emailNormalizado)) {
+      addNotification('error', 'E-mail já cadastrado');
+      return;
+    }
+    const newUser: User = {
+      id: Date.now(),
+      username: cleanText(regUsername),
+      password: regPassword,
+      role: regRole,
+      status: 'pending',
+      name: cleanText(regName),
+      email: emailNormalizado,
+      createdAt: new Date().toISOString()
+    };
+    setUsers(prev => [...prev, newUser]);
+    addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador. O e-mail poderá ser usado para recuperação de senha.');
+    setShowRegister(false);
+    setRegUsername('');
+    setRegPassword('');
+    setRegName('');
+    setRegEmail('');
+  };
 
-  if (data) {
-    const newUser = mapUserFromDb(data);
-    setUsers(prev => [newUser, ...prev]);
-  }
-
-  addNotification(
-    'success',
-    'Cadastro realizado! Aguarde a aprovação do administrador.'
-  );
-
-  setShowRegister(false);
-  setRegUsername('');
-  setRegPassword('');
-  setRegName('');
-  setRegEmail('');
-  setRegRole('operator');
-};
   // Forgot password handlers
   const handleForgotPasswordEmail = () => {
     const emailNormalizado = cleanText(forgotEmail).toLowerCase();
@@ -874,55 +827,23 @@ if (usersError) {
   };
 
   // Approve/Reject user
- const handleUserApproval = async (userId: number, status: UserStatus) => {
-  const { error } = await supabase
-    .from('users')
-    .update({ status })
-    .eq('id', userId);
+  const handleUserApproval = (userId: number, status: UserStatus) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+    addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
+  };
 
-  if (error) {
-    console.error('Erro ao atualizar status do usuário:', error);
-    addNotification('error', `Erro ao atualizar usuário: ${error.message}`);
-    return;
-  }
+  const handleDeleteUser = (userId: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (user.username === 'admin' || user.name === 'Administrador Principal') {
+      addNotification('warning', 'O Administrador Principal não pode ser excluído.');
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) return;
 
-  setUsers(prev =>
-    prev.map(u => (u.id === userId ? { ...u, status } : u))
-  );
-
-  addNotification(
-    'success',
-    `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
-  );
-};
-
-  const handleDeleteUser = async (userId: number) => {
-  const user = users.find(u => u.id === userId);
-  if (!user) return;
-
-  if (user.username === 'admin' || user.name === 'Administrador Principal') {
-    addNotification('warning', 'O Administrador Principal não pode ser excluído.');
-    return;
-  }
-
-  if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
-    return;
-  }
-
-  const { error } = await supabase
-    .from('users')
-    .delete()
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Erro ao excluir usuário:', error);
-    addNotification('error', `Erro ao excluir usuário: ${error.message}`);
-    return;
-  }
-
-  setUsers(prev => prev.filter(u => u.id !== userId));
-  addNotification('success', 'Usuário excluído com sucesso!');
-};
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    addNotification('success', 'Usuário excluído com sucesso!');
+  };
 
   // Logout
   const handleLogout = () => {
@@ -2463,179 +2384,113 @@ if (usersError) {
         </ResponsiveContainer>
       </div>
 
-           {/* Top Equipment */}
+      {/* Top Equipment */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h4 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-red-800" />
           Top Equipamentos — Consumo (Litros)
         </h4>
-
         {dashboardData.topEquipamentos.length > 0 ? (
-          <div className="w-full overflow-x-auto">
-            <div className={cn("min-w-[720px]", isMobile && "min-w-[640px]")}>
-              <ResponsiveContainer width="100%" height={isMobile ? 420 : 360}>
-                <BarChart
-                  data={dashboardData.topEquipamentos}
-                  layout="vertical"
-                  barCategoryGap={isMobile ? 10 : 18}
-                  margin={{
-                    top: 8,
-                    right: 20,
-                    left: isMobile ? 140 : 28,
-                    bottom: 8,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-
-                  <XAxis
-                    type="number"
-                    stroke="#64748b"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => formatCompactNumber(Number(v))}
-                  />
-
-                  <YAxis
-                    type="category"
-                    dataKey="equipamento"
-                    tick={(props) => (
-                      <CategoryAxisTick
-                        {...props}
-                        anchorX={-12}
-                        textAnchor="end"
-                        maxChars={isMobile ? 14 : 24}
-                      />
-                    )}
-                    tickLine={false}
-                    axisLine={false}
-                    width={isMobile ? 180 : 320}
-                  />
-
-                  <Tooltip
-                    cursor={{ fill: "rgba(148, 163, 184, 0.15)" }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const data = payload[0].payload;
-
-                      return (
-                        <div className="max-w-[280px] rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
-                          <div className="mb-2 flex items-center gap-2">
-                            <Fuel className="h-4 w-4 text-blue-500" />
-                            <p className="text-sm font-semibold leading-tight text-slate-800">
-                              {data.equipamento}
-                            </p>
-                          </div>
-
-                          {data.gerencias?.length > 0 && (
-                            <div className="mb-3 flex flex-wrap gap-1">
-                              {data.gerencias.map((ger: string) => (
-                                <span
-                                  key={ger}
-                                  className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700"
-                                >
-                                  {ger}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {data.rateioItems ? (
-                            <>
-                              <p className="mb-2 text-xs font-semibold text-slate-500">
-                                Rateio aplicado:
-                              </p>
-
-                              <div className="space-y-1">
-                                {data.rateioItems.map((item: any, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center justify-between text-xs"
-                                  >
-                                    <span className="text-slate-600">
-                                      {item.ccNovo} ({item.percentage}%)
-                                    </span>
-                                    <span className="font-semibold text-slate-800">
-                                      {formatLiters(item.litros)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <div className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-sm font-bold">
-                                <span>Total</span>
-                                <span>{formatLiters(Number(data.litros))}</span>
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-sm font-bold text-slate-800">
-                              {formatLiters(Number(data.litros))}
-                            </p>
-                          )}
+          <ResponsiveContainer width="100%" height={isMobile ? 400 : 360}>
+            <BarChart
+              data={dashboardData.topEquipamentos}
+              layout="vertical"
+              barCategoryGap={isMobile ? 12 : 18}
+              margin={{ top: 8, right: 20, left: isMobile ? 0 : 28, bottom: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+              <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatCompactNumber(Number(v))} />
+              <YAxis
+                type="category"
+                dataKey="equipamento"
+                tick={(props) => <CategoryAxisTick {...props} anchorX={isMobile ? 0 : -12} textAnchor={isMobile ? "start" : "end"} maxChars={isMobile ? 16 : 24} />}
+                tickLine={false}
+                axisLine={false}
+                width={isMobile ? 120 : 320}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-xl sm:min-w-[280px]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Fuel className="h-4 w-4 text-blue-500" />
+                        <p className="font-semibold text-slate-800 text-sm leading-tight">{data.equipamento}</p>
+                      </div>
+                      {data.gerencias?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {data.gerencias.map((ger: string) => (
+                            <span key={ger} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{ger}</span>
+                          ))}
                         </div>
-                      );
-                    }}
+                      )}
+                      {data.rateioItems ? (
+                        <>
+                          <p className="text-xs font-semibold text-slate-500 mb-2">Rateio aplicado:</p>
+                          <div className="space-y-1">
+                            {data.rateioItems.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <span className="text-slate-600">{item.ccNovo} ({item.percentage}%)</span>
+                                <span className="font-semibold text-slate-800">{formatLiters(item.litros)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-2 border-t border-slate-100 pt-2 flex justify-between text-sm font-bold">
+                            <span>Total</span>
+                            <span>{formatLiters(Number(data.litros))}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm font-bold text-slate-800">{formatLiters(Number(data.litros))}</p>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              {/* Barras: se houver rateios, divide em segmentos coloridos */}
+              {dashboardData.maxRateioSegments > 0 ? (
+                <>
+                  {/* Barra de fundo cinza para mostrar total quando não há rateio */}
+                  <Bar
+                    dataKey="litrosTotal"
+                    stackId="rateio"
+                    fill="#8B1538"
+                    radius={[0, 10, 10, 0]}
+                    maxBarSize={42}
                   />
-
-                  {dashboardData.maxRateioSegments > 0 ? (
-                    <>
+                  {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
+                    const isLast = idx === dashboardData.maxRateioSegments - 1;
+                    const isFirst = idx === 0;
+                    return (
                       <Bar
-                        dataKey="litrosTotal"
+                        key={`rateio_${idx}`}
+                        dataKey={`rateio_${idx}`}
                         stackId="rateio"
-                        fill="#8B1538"
-                        radius={[0, 10, 10, 0]}
+                        fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
+                        radius={isLast ? [0, 10, 10, 0] : isFirst ? [10, 0, 0, 10] : [0, 0, 0, 0]}
                         maxBarSize={42}
                       />
-
-                      {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => {
-                        const isLast = idx === dashboardData.maxRateioSegments - 1;
-                        const isFirst = idx === 0;
-
-                        return (
-                          <Bar
-                            key={`rateio_${idx}`}
-                            dataKey={`rateio_${idx}`}
-                            stackId="rateio"
-                            fill={RATEIO_COLORS[idx % RATEIO_COLORS.length]}
-                            radius={
-                              isLast
-                                ? [0, 10, 10, 0]
-                                : isFirst
-                                  ? [10, 0, 0, 10]
-                                  : [0, 0, 0, 0]
-                            }
-                            maxBarSize={42}
-                          />
-                        );
-                      })}
-                    </>
-                  ) : (
-                    <Bar
-                      dataKey="litros"
-                      fill="#8B1538"
-                      name="Litros"
-                      radius={[0, 10, 10, 0]}
-                      maxBarSize={42}
-                    />
-                  )}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+                    );
+                  })}
+                </>
+              ) : (
+                <Bar dataKey="litros" fill="#8B1538" name="Litros" radius={[0, 10, 10, 0]} maxBarSize={42} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         ) : (
           <p className="text-slate-400 text-center py-8">Nenhum dado disponível</p>
         )}
 
+        {/* Legenda dos rateios */}
         {dashboardData.maxRateioSegments > 0 && (
           <div className="mt-4 flex flex-wrap gap-3 justify-center border-t border-slate-100 pt-4">
             <div className="flex items-center gap-2 text-xs">
-              <span
-                className="h-3 w-3 rounded-sm"
-                style={{ backgroundColor: "#8B1538" }}
-              />
+              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#8B1538' }} />
               <span className="text-slate-600">Sem rateio</span>
             </div>
-
             {Array.from({ length: dashboardData.maxRateioSegments }).map((_, idx) => (
               <div key={`legend-${idx}`} className="flex items-center gap-2 text-xs">
                 <span
@@ -2648,6 +2503,7 @@ if (usersError) {
           </div>
         )}
       </div>
+
       {/* Rateio Charts */}
       {dashboardData.rateioData.some(r => r.litros > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
