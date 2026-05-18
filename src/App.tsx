@@ -691,6 +691,46 @@ useEffect(() => {
   }
 }, []);
   
+     // Manter usuário logado e perfil salvo após recarregar a página
+      useEffect(() => {
+        // Verificar se há token de recuperação de senha na URL
+useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isResetPassword = urlParams.get('reset_password') === 'true';
+  const type = urlParams.get('type');
+
+  if (isResetPassword || type === 'recovery') {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setShowForgotPassword(true);
+        setForgotStep('reset');
+        setForgotEmail(session.user.email || '');
+        addNotification('info', 'Defina sua nova senha.');
+        // Limpar parâmetros da URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    });
+  }
+}, []);
+        const savedUser = localStorage.getItem('stratos_current_user');
+        if (savedUser) {
+          try {
+            const parsedUser = JSON.parse(savedUser) as User;
+            setCurrentUser(parsedUser);
+            setCurrentPage(parsedUser.role === 'operator' ? 'preenchimento' : 'dashboard');
+          } catch {
+            localStorage.removeItem('stratos_current_user');
+          }
+        }
+      }, []);
+    
+      useEffect(() => {
+        if (currentUser) {
+          localStorage.setItem('stratos_current_user', JSON.stringify(currentUser));
+        } else {
+          localStorage.removeItem('stratos_current_user');
+        }
+      }, [currentUser]);
   // Add notification
   const addNotification = (type: Notification['type'], message: string) => {
     const id = Date.now();
@@ -805,7 +845,6 @@ useEffect(() => {
   setRegEmail('');
   setRegRole('operator');
 };
-  // Forgot password handlers
  // Forgot password handlers
 const handleForgotPasswordEmail = async () => {
   const emailNormalizado = cleanText(forgotEmail).toLowerCase();
@@ -1998,7 +2037,7 @@ const closeForgotPassword = () => {
         </p>
       </div>
 
-    {/* Forgot Password Modal */}
+      {/* Forgot Password Modal */}
 {showForgotPassword && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-2xl p-8 w-full max-w-md">
@@ -2098,6 +2137,7 @@ const closeForgotPassword = () => {
     </div>
   </div>
 )}
+   
             {/* Steps indicator */}
             <div className="flex items-center justify-center gap-2 mb-6">
               {['email', 'code', 'reset'].map((step, idx) => {
@@ -2247,16 +2287,15 @@ const closeForgotPassword = () => {
                       onClick={closeForgotPassword}
                       className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
                     >
-                       Cancelar
-                  </button>
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    )}
-
+      )}
       {/* Register Modal */}
       {showRegister && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
