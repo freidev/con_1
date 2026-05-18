@@ -880,57 +880,49 @@ export default function App() {
     setConfirmNewPassword('');
   };
 
-  // Approve/Reject user
+    // Approve/Reject user
   const handleUserApproval = async (userId: number, status: UserStatus) => {
-  const { error } = await supabase
-    .from('users')
-    .update({ status })
-    .eq('id', userId);
+    // Atualizar no Supabase
+    const { error } = await supabase
+      .from('users')
+      .update({ status })
+      .eq('id', userId);
 
-  if (error) {
-    console.error('Erro ao atualizar status do usuário:', error);
-    addNotification('error', `Erro ao atualizar usuário: ${error.message}`);
-    return;
-  }
+    if (error) {
+      addNotification('error', 'Erro ao atualizar status no banco.');
+      console.error(error);
+      return;
+    }
 
-  setUsers(prev =>
-    prev.map(u => (u.id === userId ? { ...u, status } : u))
-  );
-
-  addNotification(
-    'success',
-    `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
-  );
-};
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+    addNotification('success', `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`);
+  };
 
   const handleDeleteUser = async (userId: number) => {
-  const user = users.find(u => u.id === userId);
-  if (!user) return;
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    if (user.username === 'admin' || user.name === 'Administrador Principal') {
+      addNotification('warning', 'O Administrador Principal não pode ser excluído.');
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) return;
 
-  if (user.username === 'admin' || user.name === 'Administrador Principal') {
-    addNotification('warning', 'O Administrador Principal não pode ser excluído.');
-    return;
-  }
+    // Excluir do Supabase
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId);
 
-  if (!window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
-    return;
-  }
+    if (error) {
+      addNotification('error', 'Erro ao excluir usuário do banco.');
+      console.error(error);
+      return;
+    }
 
-  const { error } = await supabase
-    .from('users')
-    .delete()
-    .eq('id', userId);
-
-  if (error) {
-    console.error('Erro ao excluir usuário:', error);
-    addNotification('error', `Erro ao excluir usuário: ${error.message}`);
-    return;
-  }
-
-  setUsers(prev => prev.filter(u => u.id !== userId));
-  addNotification('success', 'Usuário excluído com sucesso!');
-};
-
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    addNotification('success', 'Usuário excluído com sucesso!');
+  };
+  
   // Logout
   const handleLogout = () => {
     setCurrentUser(null);
