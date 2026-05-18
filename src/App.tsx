@@ -2247,15 +2247,15 @@ const closeForgotPassword = () => {
                       onClick={closeForgotPassword}
                       className="flex-1 py-3 px-4 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg transition-colors"
                     >
-                      Cancelar
-                    </button>
-                  </div>
+                       Cancelar
+                  </button>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
+    )}
 
       {/* Register Modal */}
       {showRegister && (
