@@ -726,86 +726,59 @@ export default function App() {
 
       // Register handler
       const handleRegister = async () => {
-      if (!regUsername || !regPassword || !regName || !regEmail) {
-        addNotification('error', 'Preencha todos os campos');
-        return;
-      }
-    
-      const usernameNormalizado = cleanText(regUsername);
-      const emailNormalizado = cleanText(regEmail).toLowerCase();
-    
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-        addNotification('error', 'Digite um e-mail válido');
-        return;
-      }
-    
-      const usernameExistsLocal = users.find(
-        u => u.username.toLowerCase() === usernameNormalizado.toLowerCase()
-      );
-    
-      const emailExistsLocal = users.find(
-        u => (u.email || '').toLowerCase() === emailNormalizado
-      );
-    
-      if (usernameExistsLocal) {
-        addNotification('error', 'Nome de usuário já existe');
-        return;
-      }
-    
-      if (emailExistsLocal) {
-        addNotification('error', 'E-mail já cadastrado');
-        return;
-      }
-    
-      addNotification('info', 'Enviando cadastro para aprovação...');
-    
-      const userToInsert = {
-        username: usernameNormalizado,
-        password: regPassword,
-        role: regRole,
-        status: 'pending',
-        name: cleanText(regName),
-        email: emailNormalizado,
-        funcao: null,
-        avatar: null,
-        created_at: new Date().toISOString(),
-      };
-    
-      const { data, error } = await supabase
-        .from('users')
-        .insert([userToInsert])
-        .select()
-        .single();
-    
-      if (error) {
-        console.error('Erro ao cadastrar usuário:', error);
-    
-        if (error.code === '23505') {
-          addNotification('error', 'Usuário ou e-mail já cadastrado');
-        } else {
-          addNotification('error', `Erro ao cadastrar: ${error.message}`);
-        }
-    
-        return;
-      }
-    
-      if (data) {
-        const newUser = mapUserFromDb(data);
-        setUsers(prev => [newUser, ...prev]);
-      }
-    
-      addNotification(
-        'success',
-        'Cadastro realizado! Aguarde a aprovação do administrador.'
-      );
-    
-      setShowRegister(false);
-      setRegUsername('');
-      setRegPassword('');
-      setRegName('');
-      setRegEmail('');
-      setRegRole('operator');
+    if (!regUsername || !regPassword || !regName || !regEmail) {
+      addNotification('error', 'Preencha todos os campos');
+      return;
+    }
+
+    const emailNormalizado = cleanText(regEmail).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      addNotification('error', 'Digite um e-mail válido');
+      return;
+    }
+    if (users.find(u => u.username === regUsername)) {
+      addNotification('error', 'Nome de usuário já existe');
+      return;
+    }
+    if (users.find(u => (u.email || '').toLowerCase() === emailNormalizado)) {
+      addNotification('error', 'E-mail já cadastrado');
+      return;
+    }
+
+    const newUserToInsert = {
+      username: cleanText(regUsername),
+      password: regPassword,
+      role: regRole,
+      status: 'pending',
+      name: cleanText(regName),
+      email: emailNormalizado,
+      created_at: new Date().toISOString()
     };
+
+    // Salvar no Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .insert([newUserToInsert])
+      .select();
+
+    if (error) {
+      addNotification('error', 'Erro ao cadastrar no banco. Tente novamente.');
+      console.error(error);
+      return;
+    }
+
+    if (data && data[0]) {
+      const newUser = mapUserFromDb(data[0]);
+      setUsers(prev => [...prev, newUser]);
+    }
+
+    addNotification('success', 'Cadastro realizado! Aguarde a aprovação do administrador. O e-mail poderá ser usado para recuperação de senha.');
+    setShowRegister(false);
+    setRegUsername('');
+    setRegPassword('');
+    setRegName('');
+    setRegEmail('');
+  };
 
   // Forgot password handlers
   const handleForgotPasswordEmail = () => {
