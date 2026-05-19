@@ -979,17 +979,46 @@ export default function App() {
 
   // Add equipment
   const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
-    const newEquipment = {
-      ...equipment,
-      equipment: cleanText(equipment.equipment),
-      plate: cleanText(equipment.plate),
-      cc_novo: equipment.ccNovo.map(cleanText), // Mapear para nome da coluna no banco
-      gerencia: cleanText(equipment.gerencia),
-      area_lotacao: cleanText(equipment.areaLotacao),
-      area: cleanText(equipment.area),
-      fornecedor: cleanText(equipment.fornecedor),
-      created_at: new Date().toISOString()
-    };
+  const newEquipment = {
+    equipment: cleanText(equipment.equipment),
+    plate: cleanText(equipment.plate || ''),
+    cc_novo: equipment.ccNovo.map(cleanText).filter(Boolean),
+    gerencia: cleanText(equipment.gerencia),
+    area_lotacao: cleanText(equipment.areaLotacao),
+    area: cleanText(equipment.area),
+    fornecedor: cleanText(equipment.fornecedor),
+    created_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('equipamentos')
+    .insert([newEquipment])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro detalhado ao salvar equipamento:', error);
+    addNotification('error', `Erro ao salvar equipamento: ${error.message}`);
+    return;
+  }
+
+  const localEquipment: Equipment = {
+    id: data.id,
+    equipment: data.equipment,
+    plate: data.plate || '',
+    ccNovo: data.cc_novo || [],
+    gerencia: data.gerencia || '',
+    areaLotacao: data.area_lotacao || '',
+    area: data.area || '',
+    fornecedor: data.fornecedor || '',
+    createdAt: data.created_at,
+  };
+
+  setEquipments(prev => [...prev, localEquipment]);
+  setDatabaseTab('equipamentos');
+  setCurrentPage('database');
+  addNotification('success', 'Equipamento salvo no banco com sucesso!');
+};
 
     // Inserir no Supabase
     const { data, error } = await supabase
@@ -1064,107 +1093,161 @@ const handleDeleteEquipment = async (equipmentId: number) => {
 };
   // Add rateio
     // ✅ CORREÇÃO: handleAddRateio — salva no Supabase
-    const handleAddRateio = async (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
-      const newRateio = {
-        equipment: cleanText(rateio.equipment),
-        description: cleanText(rateio.description),
-        items: JSON.stringify(rateio.items.map((item) => ({
-          ...item,
-          gerencia: cleanText(item.gerencia),
-          ccNovo: cleanText(item.ccNovo),
-          description: cleanText(item.description),
-        }))),
-        created_at: new Date().toISOString(),
-      };
-    
-      const { data, error } = await supabase
-        .from('rateios')
-        .insert([newRateio])
-        .select()
-        .single();
-    
-      if (error) {
-        addNotification('error', 'Erro ao salvar rateio: ' + error.message);
-        console.error(error);
-        return;
-      }
-    
-      const localRateio: Rateio = {
-        id: data.id,
-        equipment: data.equipment,
-        description: data.description,
-        items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items,
-        createdAt: data.created_at,
-      };
-    
-      setRateios(prev => [...prev, localRateio]);
-      setShowRateioForm(false);
-      addNotification('success', 'Rateio salvo na nuvem com sucesso!');
-    };
-
-  // Add budget
-  // ✅ CORREÇÃO: handleAddBudget — salva no Supabase
-const handleAddBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
-  const newBudget = {
-    gerencia: cleanText(budget.gerencia),
-    diretoria: cleanText(budget.diretoria || ''),
-    periodo: cleanText(budget.periodo),
-    orcamento: budget.orcamento,
-    realizado: 0,
-    data_inicio: budget.dataInicio || null,
-    data_fim: budget.dataFim || null,
+    const handleAddRateio = async (
+  rateio: Omit<Rateio, 'id' | 'createdAt'>
+) => {
+  const newRateio = {
+    equipment: cleanText(rateio.equipment),
+    description: cleanText(rateio.description),
+    items: rateio.items.map(item => ({
+      ...item,
+      gerencia: cleanText(item.gerencia),
+      ccNovo: cleanText(item.ccNovo),
+      description: cleanText(item.description),
+    })),
     created_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase
-    .from('budgets')
-    .insert([newBudget])
+    .from('rateios')
+    .insert([newRateio])
     .select()
     .single();
 
   if (error) {
-    addNotification('error', 'Erro ao salvar orçamento: ' + error.message);
-    console.error(error);
+    console.error('Erro detalhado ao salvar rateio:', error);
+    addNotification('error', `Erro ao salvar rateio: ${error.message}`);
     return;
   }
 
-  const localBudget: Budget = {
+  const localRateio: Rateio = {
     id: data.id,
-    gerencia: data.gerencia,
-    diretoria: data.diretoria,
-    periodo: data.periodo,
-    orcamento: data.orcamento,
-    realizado: data.realizado,
-    dataInicio: data.data_inicio,
-    dataFim: data.data_fim,
+    equipment: data.equipment,
+    description: data.description,
+    items: data.items || [],
     createdAt: data.created_at,
   };
 
-  setBudgets(prev => [...prev, localBudget]);
-  addNotification('success', 'Orçamento salvo na nuvem!');
+  setRateios(prev => [...prev, localRateio]);
+  setShowRateioForm(false);
+  addNotification('success', 'Rateio salvo no banco com sucesso!');
 };
-  
-  // Add abastecimento
-  const handleAddAbastecimento = async (abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>) => {
-    const valor = abastecimento.litros * dieselPrice.price;
-    const newAbastecimento = {
-      ...abastecimento,
-      cc_novo: cleanText(abastecimento.ccNovo),
-      diretoria: cleanText(abastecimento.diretoria),
-      gerencia: cleanText(abastecimento.gerencia),
-      area_lotacao: cleanText(abastecimento.areaLotacao),
-      fornecedor: cleanText(abastecimento.fornecedor),
-      equipamento: cleanText(abastecimento.equipamento),
-      area: cleanText(abastecimento.area),
-      semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
-      data: normalizeDateValue(abastecimento.data),
-      observacoes: cleanText(abastecimento.observacoes || ''),
-      rateio_info: abastecimento.rateioInfo ? JSON.stringify(abastecimento.rateioInfo) : null,
-      valor,
-      created_by: cleanText(currentUser?.name || 'Unknown'),
-      created_at: new Date().toISOString()
-    };
 
+  // Add budget
+  // ✅ CORREÇÃO: handleAddBudget — salva no Supabase
+  const handleAddBudget = async (
+    budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>
+  ) => {
+    const newBudget = {
+      gerencia: cleanText(budget.gerencia),
+      diretoria: cleanText(budget.diretoria || ''),
+      periodo: cleanText(budget.periodo),
+      orcamento: Number(budget.orcamento),
+      realizado: 0,
+      data_inicio: budget.dataInicio || null,
+      data_fim: budget.dataFim || null,
+      created_at: new Date().toISOString(),
+    };
+  
+    const { data, error } = await supabase
+      .from('budgets')
+      .insert([newBudget])
+      .select()
+      .single();
+  
+    if (error) {
+      console.error('Erro detalhado ao salvar orçamento:', error);
+      addNotification('error', `Erro ao salvar orçamento: ${error.message}`);
+      return;
+    }
+  
+    const localBudget: Budget = {
+      id: data.id,
+      gerencia: data.gerencia,
+      diretoria: data.diretoria,
+      periodo: data.periodo,
+      orcamento: Number(data.orcamento),
+      realizado: Number(data.realizado),
+      dataInicio: data.data_inicio,
+      dataFim: data.data_fim,
+      createdAt: data.created_at,
+    };
+  
+    setBudgets(prev => [...prev, localBudget]);
+    addNotification('success', 'Orçamento salvo no banco com sucesso!');
+  };
+    
+  // Add abastecimento
+  const handleAddAbastecimento = async (
+  abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>
+) => {
+  const valor = Number(abastecimento.litros) * Number(dieselPrice.price);
+
+  const newAbastecimento = {
+    cc_novo: cleanText(abastecimento.ccNovo),
+    diretoria: cleanText(abastecimento.diretoria),
+    gerencia: cleanText(abastecimento.gerencia),
+    area_lotacao: cleanText(abastecimento.areaLotacao),
+    fornecedor: cleanText(abastecimento.fornecedor),
+    equipamento: cleanText(abastecimento.equipamento),
+    area: cleanText(abastecimento.area),
+    semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
+    data: normalizeDateValue(abastecimento.data),
+    litros: Number(abastecimento.litros),
+    valor,
+    observacoes: cleanText(abastecimento.observacoes || ''),
+    rateio_info: abastecimento.rateioInfo
+      ? JSON.stringify(abastecimento.rateioInfo)
+      : null,
+    created_by: cleanText(currentUser?.name || 'Unknown'),
+    created_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('abastecimentos')
+    .insert([newAbastecimento])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro detalhado ao salvar abastecimento:', error);
+    addNotification('error', `Erro ao salvar abastecimento: ${error.message}`);
+    return;
+  }
+
+  const localRecord: Abastecimento = {
+    id: data.id,
+    ccNovo: data.cc_novo,
+    diretoria: data.diretoria,
+    gerencia: data.gerencia,
+    areaLotacao: data.area_lotacao,
+    fornecedor: data.fornecedor,
+    equipamento: data.equipamento,
+    area: data.area,
+    semana: data.semana,
+    data: data.data,
+    litros: Number(data.litros),
+    valor: Number(data.valor),
+    observacoes: data.observacoes || '',
+    rateioInfo: data.rateio_info ? JSON.parse(data.rateio_info) : undefined,
+    createdBy: data.created_by,
+    createdAt: data.created_at,
+  };
+
+  setAbastecimentos(prev => [localRecord, ...prev]);
+
+  if (localRecord.diretoria) {
+    setBudgets(prev =>
+      prev.map(b =>
+        b.diretoria === localRecord.diretoria
+          ? { ...b, realizado: b.realizado + valor }
+          : b
+      )
+    );
+  }
+
+  addNotification('success', 'Abastecimento salvo no banco com sucesso!');
+};
     // Inserir no Supabase
     const { data, error } = await supabase
       .from('abastecimentos')
@@ -1202,21 +1285,57 @@ const handleAddBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'realiz
   };
 
   // Update diesel price
-  const handleUpdateDieselPrice = () => {
-    const price = parseFloat(newDieselPrice);
-    if (isNaN(price) || price <= 0) {
-      addNotification('error', 'Preço inválido');
-      return;
-    }
+  const handleUpdateDieselPrice = async () => {
+  const price = parseFloat(newDieselPrice);
 
-    const newDiesel = {
-      id: 1,
-      price,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser?.username || 'unknown'
-    };
+  if (isNaN(price) || price <= 0) {
+    addNotification('error', 'Preço inválido');
+    return;
+  }
 
-    setDieselPrice(newDiesel);
+  const updatedDiesel = {
+    price,
+    updated_at: new Date().toISOString(),
+    updated_by: currentUser?.username || 'unknown',
+  };
+
+  const { data, error } = await supabase
+    .from('diesel_prices')
+    .upsert(
+      {
+        id: 1,
+        ...updatedDiesel,
+      },
+      { onConflict: 'id' }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erro detalhado ao salvar diesel:', error);
+    addNotification('error', `Erro ao salvar diesel: ${error.message}`);
+    return;
+  }
+
+  const newDiesel = {
+    id: data.id,
+    price: Number(data.price),
+    updatedAt: data.updated_at,
+    updatedBy: data.updated_by,
+  };
+
+  setDieselPrice(newDiesel);
+
+  setAbastecimentos(prev =>
+    prev.map(a => ({
+      ...a,
+      valor: a.litros * price,
+    }))
+  );
+
+  setNewDieselPrice('');
+  addNotification('success', 'Preço do diesel salvo no Supabase!');
+};
 
     // Recalcula o valor de todos os abastecimentos com o novo preço
     setAbastecimentos(prev => prev.map(a => ({
