@@ -564,30 +564,49 @@ export default function App() {
   };
 }, []);
   
-            useEffect(() => {
-        async function loadData() {
-      // Carregar Equipamentos
-      const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
-      if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
+         
+       // ✅ CORREÇÃO: Carregar rateios e budgets do Supabase no loadData()
+  useEffect(() => {
+  async function loadData() {
+    // Equipamentos
+    const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
+    if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-      // Carregar Usuários
-      const { data: uData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (usersError) {
-        console.error('Erro ao carregar usuários:', usersError);
-      } else if (uData && uData.length > 0) {
-        setUsers(uData.map(mapUserFromDb));
-      }
+    // Usuários
+    const { data: uData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+    if (uData && uData.length > 0) setUsers(uData.map(mapUserFromDb));
 
-      // Carregar Abastecimentos
-      const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
-      if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
-    }
-    loadData();
-  }, []);
+    // Abastecimentos
+    const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
+    if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
+
+    // ✅ Adicione estas duas linhas que estavam FALTANDO:
+    // Orçamentos (Aba 4)
+    const { data: budgetsData } = await supabase.from('budgets').select('*').order('id', { ascending: false });
+    if (budgetsData) setBudgets(budgetsData.map(b => ({
+      id: b.id,
+      gerencia: b.gerencia,
+      diretoria: b.diretoria,
+      periodo: b.periodo,
+      orcamento: b.orcamento,
+      realizado: b.realizado,
+      dataInicio: b.data_inicio,
+      dataFim: b.data_fim,
+      createdAt: b.created_at,
+    })));
+
+    // Rateios (Aba 5)
+    const { data: rateiosData } = await supabase.from('rateios').select('*').order('id', { ascending: false });
+    if (rateiosData) setRateios(rateiosData.map(r => ({
+      id: r.id,
+      equipment: r.equipment,
+      description: r.description,
+      items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []),
+      createdAt: r.created_at,
+    })));
+  }
+  loadData();
+}, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -989,34 +1008,60 @@ export default function App() {
     }
   };
 
-  const handleUpdateEquipment = (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
-    if (!editingEquipment) return;
+ // ✅ CORREÇÃO: handleUpdateEquipment — salva no Supabase
+const handleUpdateEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
+  if (!editingEquipment) return;
 
-    const updatedEquipment: Equipment = {
-      ...editingEquipment,
-      ...equipment,
-      equipment: cleanText(equipment.equipment),
-      plate: cleanText(equipment.plate),
-      ccNovo: equipment.ccNovo.map(cleanText).filter(Boolean),
-      gerencia: cleanText(equipment.gerencia),
-      areaLotacao: cleanText(equipment.areaLotacao),
-      area: cleanText(equipment.area),
-      fornecedor: cleanText(equipment.fornecedor),
-    };
-
-    setEquipments(prev => prev.map(item => item.id === editingEquipment.id ? updatedEquipment : item));
-    setEditingEquipment(null);
-    addNotification('success', 'Equipamento atualizado com sucesso!');
+  const updated = {
+    equipment: cleanText(equipment.equipment),
+    plate: cleanText(equipment.plate),
+    cc_novo: equipment.ccNovo.map(cleanText).filter(Boolean),
+    gerencia: cleanText(equipment.gerencia),
+    area_lotacao: cleanText(equipment.areaLotacao),
+    area: cleanText(equipment.area),
+    fornecedor: cleanText(equipment.fornecedor),
   };
 
-  const handleDeleteEquipment = (equipmentId: number) => {
-    if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
-    setEquipments(prev => prev.filter(item => item.id !== equipmentId));
-    setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
-    if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
-    addNotification('success', 'Equipamento excluído com sucesso!');
-  };
+  const { error } = await supabase
+    .from('equipamentos')
+    .update(updated)
+    .eq('id', editingEquipment.id);
 
+  if (error) {
+    addNotification('error', 'Erro ao atualizar equipamento: ' + error.message);
+    console.error(error);
+    return;
+  }
+
+  setEquipments(prev => prev.map(item =>
+    item.id === editingEquipment.id
+      ? { ...item, ...equipment, ccNovo: updated.cc_novo, areaLotacao: updated.area_lotacao }
+      : item
+  ));
+  setEditingEquipment(null);
+  addNotification('success', 'Equipamento atualizado na nuvem!');
+};
+
+  // ✅ CORREÇÃO: handleDeleteEquipment — deleta no Supabase
+const handleDeleteEquipment = async (equipmentId: number) => {
+  if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
+
+  const { error } = await supabase
+    .from('equipamentos')
+    .delete()
+    .eq('id', equipmentId);
+
+  if (error) {
+    addNotification('error', 'Erro ao excluir equipamento: ' + error.message);
+    console.error(error);
+    return;
+  }
+
+  setEquipments(prev => prev.filter(item => item.id !== equipmentId));
+  setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
+  if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
+  addNotification('success', 'Equipamento excluído com sucesso!');
+};
   // Add rateio
     // ✅ CORREÇÃO: handleAddRateio — salva no Supabase
     const handleAddRateio = async (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
@@ -1058,19 +1103,47 @@ export default function App() {
     };
 
   // Add budget
-  const handleAddBudget = (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
-    const newBudget: Budget = {
-      ...budget,
-      diretoria: cleanText(budget.diretoria),
-      periodo: cleanText(budget.periodo),
-      id: Date.now(),
-      realizado: 0,
-      createdAt: new Date().toISOString()
-    };
-    setBudgets(prev => [...prev, newBudget]);
-    addNotification('success', 'Orçamento cadastrado! Dashboard atualizado automaticamente.');
+  // ✅ CORREÇÃO: handleAddBudget — salva no Supabase
+const handleAddBudget = async (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
+  const newBudget = {
+    gerencia: cleanText(budget.gerencia),
+    diretoria: cleanText(budget.diretoria || ''),
+    periodo: cleanText(budget.periodo),
+    orcamento: budget.orcamento,
+    realizado: 0,
+    data_inicio: budget.dataInicio || null,
+    data_fim: budget.dataFim || null,
+    created_at: new Date().toISOString(),
   };
 
+  const { data, error } = await supabase
+    .from('budgets')
+    .insert([newBudget])
+    .select()
+    .single();
+
+  if (error) {
+    addNotification('error', 'Erro ao salvar orçamento: ' + error.message);
+    console.error(error);
+    return;
+  }
+
+  const localBudget: Budget = {
+    id: data.id,
+    gerencia: data.gerencia,
+    diretoria: data.diretoria,
+    periodo: data.periodo,
+    orcamento: data.orcamento,
+    realizado: data.realizado,
+    dataInicio: data.data_inicio,
+    dataFim: data.data_fim,
+    createdAt: data.created_at,
+  };
+
+  setBudgets(prev => [...prev, localBudget]);
+  addNotification('success', 'Orçamento salvo na nuvem!');
+};
+  
   // Add abastecimento
   const handleAddAbastecimento = async (abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>) => {
     const valor = abastecimento.litros * dieselPrice.price;
