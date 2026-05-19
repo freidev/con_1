@@ -1161,7 +1161,7 @@ const handleDeleteEquipment = async (equipmentId: number) => {
   };
     
   // Add abastecimento
-  const handleAddAbastecimento = async (
+ const handleAddAbastecimento = async (
   abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>
 ) => {
   const valor = Number(abastecimento.litros) * Number(dieselPrice.price);
@@ -1231,41 +1231,6 @@ const handleDeleteEquipment = async (equipmentId: number) => {
 
   addNotification('success', 'Abastecimento salvo no banco com sucesso!');
 };
-    // Inserir no Supabase
-    const { data, error } = await supabase
-      .from('abastecimentos')
-      .insert([newAbastecimento])
-      .select();
-
-    if (data && !error) {
-      const dbRecord = data[0];
-      // Ajustar formato para o estado local
-      const localRecord = {
-          ...dbRecord,
-          rateioInfo: dbRecord.rateio_info ? JSON.parse(dbRecord.rateio_info) : undefined,
-          ccNovo: dbRecord.cc_novo,
-          areaLotacao: dbRecord.area_lotacao,
-          createdBy: dbRecord.created_by,
-          createdAt: dbRecord.created_at
-      };
-
-      setAbastecimentos(prev => [localRecord, ...prev]);
-      
-      // Update budget realizado
-      if (localRecord.diretoria) {
-        setBudgets(prev => prev.map(b => 
-          b.diretoria === localRecord.diretoria 
-            ? { ...b, realizado: b.realizado + valor }
-            : b
-        ));
-      }
-      
-      addNotification('success', 'Abastecimento salvo no banco com sucesso!');
-    } else {
-      addNotification('error', 'Erro ao salvar abastecimento no banco.');
-      console.error(error);
-    }
-  };
 
   // Update diesel price
   const handleUpdateDieselPrice = async () => {
