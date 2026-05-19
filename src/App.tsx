@@ -564,7 +564,7 @@ export default function App() {
   };
 }, []);
   
-
+      async function loadData() {
       
       // Carregar Equipamentos
       const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
