@@ -1018,23 +1018,44 @@ export default function App() {
   };
 
   // Add rateio
-  const handleAddRateio = (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
-    const newRateio: Rateio = {
-      ...rateio,
-      equipment: cleanText(rateio.equipment),
-      description: cleanText(rateio.description),
-      items: rateio.items.map((item) => ({
-        ...item,
-        gerencia: cleanText(item.gerencia),
-        ccNovo: cleanText(item.ccNovo),
-        description: cleanText(item.description),
-      })),
-      id: Date.now(),
-      createdAt: new Date().toISOString()
+    // ✅ CORREÇÃO: handleAddRateio — salva no Supabase
+    const handleAddRateio = async (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
+      const newRateio = {
+        equipment: cleanText(rateio.equipment),
+        description: cleanText(rateio.description),
+        items: JSON.stringify(rateio.items.map((item) => ({
+          ...item,
+          gerencia: cleanText(item.gerencia),
+          ccNovo: cleanText(item.ccNovo),
+          description: cleanText(item.description),
+        }))),
+        created_at: new Date().toISOString(),
+      };
+    
+      const { data, error } = await supabase
+        .from('rateios')
+        .insert([newRateio])
+        .select()
+        .single();
+    
+      if (error) {
+        addNotification('error', 'Erro ao salvar rateio: ' + error.message);
+        console.error(error);
+        return;
+      }
+    
+      const localRateio: Rateio = {
+        id: data.id,
+        equipment: data.equipment,
+        description: data.description,
+        items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items,
+        createdAt: data.created_at,
+      };
+    
+      setRateios(prev => [...prev, localRateio]);
+      setShowRateioForm(false);
+      addNotification('success', 'Rateio salvo na nuvem com sucesso!');
     };
-    setRateios(prev => [...prev, newRateio]);
-    addNotification('success', 'Rateio cadastrado com sucesso!');
-  };
 
   // Add budget
   const handleAddBudget = (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
