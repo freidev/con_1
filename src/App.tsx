@@ -977,8 +977,8 @@ export default function App() {
     addNotification('info', 'Você saiu do sistema');
   };
 
-  // Add equipment
-  const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
+ // Add equipment
+const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
   const newEquipment = {
     equipment: cleanText(equipment.equipment),
     plate: cleanText(equipment.plate || ''),
@@ -1019,23 +1019,6 @@ export default function App() {
   setCurrentPage('database');
   addNotification('success', 'Equipamento salvo no banco com sucesso!');
 };
-
-    // Inserir no Supabase
-    const { data, error } = await supabase
-      .from('equipamentos')
-      .insert([newEquipment])
-      .select();
-
-    if (data && !error) {
-      setEquipments(prev => [...prev, data[0] as any]);
-      setDatabaseTab('equipamentos');
-      setCurrentPage('database');
-      addNotification('success', 'Equipamento salvo no banco com sucesso!');
-    } else {
-      addNotification('error', 'Erro ao salvar equipamento no banco.');
-      console.error(error);
-    }
-  };
 
  // ✅ CORREÇÃO: handleUpdateEquipment — salva no Supabase
 const handleUpdateEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
