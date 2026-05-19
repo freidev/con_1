@@ -1741,7 +1741,7 @@ export default function App() {
           {/* ESPAÇO PARA A LOGO - Logo externa — substitua por: <img src="/sua-logo.png" alt="Logo" className="h-full w-full object-contain" /> */}
           <div className="mx-auto mb-6 flex h-20 w-full max-w-72 items-center justify-center rounded-2xl bg-white shadow-lg">
             <img 
-              src="/sua-logo.png" 
+              src="/logo.png" 
               alt="Logo" 
               className="h-full w-full object-contain" 
               />
