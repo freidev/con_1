@@ -928,23 +928,44 @@ export default function App() {
     addNotification('success', `Novo código enviado! Código: ${code} (válido por 10 min)`);
   };
 
-  const handleResetPassword = () => {
-    if (!newPassword || !confirmNewPassword) {
-      addNotification('error', 'Preencha os dois campos de senha');
-      return;
-    }
-    if (newPassword.length < 4) {
-      addNotification('error', 'A senha deve ter no mínimo 4 caracteres');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      addNotification('error', 'As senhas não coincidem');
-      return;
-    }
-    setUsers(prev => prev.map(u => u.id === forgotUserId ? { ...u, password: newPassword } : u));
-    addNotification('success', 'Senha redefinida com sucesso! Faça login com a nova senha.');
-    closeForgotPassword();
-  };
+  / ✅ CORRIGIDO - Salva no banco e no estado
+const handleResetPassword = async () => {
+  if (!newPassword || !confirmNewPassword) {
+    addNotification('error', 'Preencha os dois campos de senha');
+    return;
+  }
+  if (newPassword.length < 4) {
+    addNotification('error', 'A senha deve ter no mínimo 4 caracteres');
+    return;
+  }
+  if (newPassword !== confirmNewPassword) {
+    addNotification('error', 'As senhas não coincidem');
+    return;
+  }
+  if (!forgotUserId) return;
+
+  // Atualiza no banco
+  const { error } = await supabase
+    .from('users')
+    .update({ password: newPassword })
+    .eq('id', forgotUserId);
+
+  if (error) {
+    console.error('ERRO ao redefinir senha:', error);
+    addNotification('error', `Erro ao redefinir senha: ${error.message}`);
+    return;
+  }
+
+  // Atualiza no estado local
+  setUsers(prev =>
+    prev.map(u =>
+      u.id === forgotUserId ? { ...u, password: newPassword } : u
+    )
+  );
+
+  addNotification('success', 'Senha redefinida com sucesso! Faça login com a nova senha.');
+  closeForgotPassword();
+};
 
   const closeForgotPassword = () => {
     setShowForgotPassword(false);
@@ -6036,8 +6057,19 @@ const handleRemoveAvatar = async () => {
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:tracking-[0.22em]">Painel de controle</p>
                 <h2 className="mt-1 truncate text-2xl font-semibold text-slate-900">
-                  {([...navItems, ...(currentUser.role === 'admin' ? adminNavItems : [])].find(item => item.id === currentPage)?.label) || 'Sistema'}
-                </h2>
+                    {(() => {
+                      const extraPages: Record<string, string> = {
+                        profile: 'Meu Perfil',
+                        diesel: 'Valor Diesel',
+                      };
+                      return (
+                        extraPages[currentPage] ||
+                        [...navItems, ...adminNavItems]
+                          .find(item => item.id === currentPage)?.label ||
+                        'Sistema'
+                      );
+                    })()}
+                  </h2>
               </div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-slate-600 sm:gap-3">
