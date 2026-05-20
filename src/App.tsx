@@ -4250,7 +4250,6 @@ onAdd={async (r: any) => {
           </div>
           <div className="relative w-full max-w-full xl:justify-self-end">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            // ✅ CORRIGIDO - Conectado ao estado equipmentSearch
 <input
   type="text"
   value={equipmentSearch}
@@ -4646,7 +4645,6 @@ onAdd={async (r: any) => {
             <Plus className="w-5 h-5 text-red-800" />
             Preenchimento de Abastecimento
           </h3>
-           // ✅ CORRIGIDO - Mostra o próximo ID real baseado no maior ID existente
 <p className="text-sm text-slate-500">
   Próximo ID: {abastecimentos.length > 0
     ? Math.max(...abastecimentos.map(a => a.id)) + 1
