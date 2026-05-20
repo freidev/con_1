@@ -928,7 +928,7 @@ export default function App() {
     addNotification('success', `Novo código enviado! Código: ${code} (válido por 10 min)`);
   };
 
-  / ✅ CORRIGIDO - Salva no banco e no estado
+  // ✅ CORRIGIDO - Salva no banco e no estado
 const handleResetPassword = async () => {
   if (!newPassword || !confirmNewPassword) {
     addNotification('error', 'Preencha os dois campos de senha');
