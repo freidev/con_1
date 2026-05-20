@@ -3701,10 +3701,25 @@ export default function App() {
                 {rateios.length} ativo{rateios.length !== 1 ? 's' : ''}
               </span>
               <button
-                onClick={() => {
-                  setEditingRateio(null);
-                  setShowRateioForm(f => !f);
+                // ✅ CORRIGIDO - Apaga do banco e do estado
+                onClick={async () => {
+                  if (!window.confirm('Tem certeza que deseja excluir este rateio?')) return;
+                
+                  const { error } = await supabase
+                    .from('rateios')
+                    .delete()
+                    .eq('id', r.id);
+                
+                  if (error) {
+                    console.error('ERRO ao excluir rateio:', error);
+                    addNotification('error', `Erro ao excluir rateio: ${error.message}`);
+                    return;
+                  }
+                
+                  setRateios(prev => prev.filter(x => x.id !== r.id));
+                  addNotification('success', 'Rateio removido com sucesso!');
                 }}
+                
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-blue-700 sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
@@ -3732,27 +3747,49 @@ export default function App() {
             <RateioForm
               equipments={equipments}
               initialRateio={editingRateio}
-              onAdd={(r: any) => {
-                if (editingRateio) {
-                  setRateios(prev => prev.map(item => item.id === editingRateio.id ? {
-                    ...editingRateio,
-                    ...r,
-                    equipment: cleanText(r.equipment),
-                    description: cleanText(r.description),
-                    items: r.items.map((rateioItem: RateioItem) => ({
-                      ...rateioItem,
-                      gerencia: cleanText(rateioItem.gerencia),
-                      ccNovo: cleanText(rateioItem.ccNovo),
-                      description: cleanText(rateioItem.description),
-                    })),
-                  } : item));
-                  addNotification('success', 'Rateio atualizado com sucesso!');
-                } else {
-                  handleAddRateio(r);
-                }
-                setShowRateioForm(false);
-                setEditingRateio(null);
-              }}
+              // ✅ CORRIGIDO - Edita no banco e no estado
+onAdd={async (r: any) => {
+  if (editingRateio) {
+
+    const payload = {
+      equipment: cleanText(r.equipment),
+      description: cleanText(r.description),
+      items: r.items.map((rateioItem: RateioItem) => ({
+        ...rateioItem,
+        gerencia: cleanText(rateioItem.gerencia),
+        ccNovo: cleanText(rateioItem.ccNovo),
+        description: cleanText(rateioItem.description),
+      })),
+    };
+
+    const { error } = await supabase
+      .from('rateios')
+      .update(payload)
+      .eq('id', editingRateio.id);
+
+    if (error) {
+      console.error('ERRO ao atualizar rateio:', error);
+      addNotification('error', `Erro ao atualizar rateio: ${error.message}`);
+      return;
+    }
+
+    setRateios(prev =>
+      prev.map(item =>
+        item.id === editingRateio.id
+          ? { ...editingRateio, ...payload }
+          : item
+      )
+    );
+    addNotification('success', 'Rateio atualizado com sucesso!');
+
+  } else {
+    // Novo rateio - chama a função já corrigida anteriormente
+    await handleAddRateio(r);
+  }
+
+  setShowRateioForm(false);
+  setEditingRateio(null);
+}}
             />
           </div>
         )}
@@ -4183,10 +4220,17 @@ export default function App() {
               <Check className="w-4 h-4" />
               {submitButtonText}
             </button>
-            <button className="px-6 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg flex items-center gap-2">
-              <X className="w-4 h-4" />
-              Cancelar
-            </button>
+            <button
+                    type="button"
+                    onClick={() => {
+                      setShowRateioForm(false);
+                      setEditingRateio(null);
+                    }}
+                    className="px-6 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancelar
+              </button>
           </div>
         </div>
       </div>
