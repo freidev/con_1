@@ -841,28 +841,6 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Manter usuário logado e perfil salvo após recarregar a página
-  useEffect(() => {
-    const savedUser = localStorage.getItem('stratos_current_user');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser) as User;
-        setCurrentUser(parsedUser);
-        setCurrentPage(parsedUser.role === 'operator' ? 'preenchimento' : 'dashboard');
-      } catch {
-        localStorage.removeItem('stratos_current_user');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('stratos_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('stratos_current_user');
-    }
-  }, [currentUser]);
   
   // Add notification
   const addNotification = (type: Notification['type'], message: string) => {
