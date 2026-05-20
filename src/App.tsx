@@ -536,6 +536,7 @@ export default function App() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
   // Supabase Data Fetching
+  
  useEffect(() => {
    // =============================================
   // REALTIME - Atualiza tudo automaticamente
@@ -677,11 +678,6 @@ export default function App() {
     supabase.removeChannel(budgetsChannel);
     supabase.removeChannel(raiteiosChannel);
     supabase.removeChannel(dieselChannel);
-  };
-}, []);
-
-  return () => {
-    supabase.removeChannel(channel);
   };
 }, []);
   
