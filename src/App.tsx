@@ -960,48 +960,37 @@ export default function App() {
 
   // Add equipment
   const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
-    
-    // Objeto limpo, APENAS com colunas existentes
-    const newEquipment = {
-      equipment: cleanText(equipment.equipment),
-      plate: cleanText(equipment.plate),
-      cc_novo: equipment.ccNovo.map(cleanText), 
-      gerencia: cleanText(equipment.gerencia),
-      area_lotacao: cleanText(equipment.areaLotacao),
-      area: cleanText(equipment.area),
-      fornecedor: cleanText(equipment.fornecedor),
-      created_at: new Date().toISOString()
-    };
-
-    // Inserir no Supabase
-    const { data, error } = await supabase
-      .from('equipamentos')
-      .insert([newEquipment])
-      .select();
-
-    if (error) {
-      alert(`Erro do Banco: ${error.message}`);
-      console.error("ERRO SUPABASE:", error);
-      addNotification('error', 'Erro ao salvar equipamento no banco.');
-      return;
-    }
-
-    if (data) {
-      // É importante mapear de volta para o formato camelCase do seu React
-      const dbEq = data[0];
-      const localEquipment = {
-        ...dbEq,
-        ccNovo: dbEq.cc_novo,
-        areaLotacao: dbEq.area_lotacao,
-        createdAt: dbEq.created_at
-      };
-      
-      setEquipments(prev => [...prev, localEquipment as any]);
-      setDatabaseTab('equipamentos');
-      setCurrentPage('database');
-      addNotification('success', 'Equipamento salvo no banco com sucesso!');
-    }
+  const newEquipment = {
+    equipment: cleanText(equipment.equipment),
+    plate: cleanText(equipment.plate),
+    cc_novo: equipment.ccNovo.map(cleanText),
+    gerencia: cleanText(equipment.gerencia),
+    area_lotacao: cleanText(equipment.areaLotacao),
+    area: cleanText(equipment.area),
+    fornecedor: cleanText(equipment.fornecedor),
+    created_at: new Date().toISOString()
   };
+
+  const { data, error } = await supabase
+    .from('equipamentos')
+    .insert([newEquipment])
+    .select();
+
+  if (error) {
+    alert(`Erro do Banco: ${error.message}`);
+    console.error("ERRO SUPABASE:", error);
+    addNotification('error', 'Erro ao salvar equipamento no banco.');
+    return;
+  }
+
+  if (data) {
+    const localEquipment = mapEquipmentFromDb(data[0]);
+    setEquipments(prev => [...prev, localEquipment]);
+    setDatabaseTab('equipamentos');
+    setCurrentPage('database');
+    addNotification('success', 'Equipamento salvo com sucesso!');
+  }
+};
 
   const handleDeleteEquipment = (equipmentId: number) => {
     if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
@@ -1046,65 +1035,53 @@ export default function App() {
 
   // Add abastecimento
    const handleAddAbastecimento = async (abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>) => {
-    const valor = abastecimento.litros * dieselPrice.price;
-    
-    // Objeto limpo, APENAS com as colunas que existem no Supabase
-    const newAbastecimento = {
-      litros: abastecimento.litros, // Precisamos declarar explicitamente agora
-      cc_novo: cleanText(abastecimento.ccNovo),
-      diretoria: cleanText(abastecimento.diretoria),
-      gerencia: cleanText(abastecimento.gerencia),
-      area_lotacao: cleanText(abastecimento.areaLotacao),
-      fornecedor: cleanText(abastecimento.fornecedor),
-      equipamento: cleanText(abastecimento.equipamento),
-      area: cleanText(abastecimento.area),
-      semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
-      data: normalizeDateValue(abastecimento.data),
-      observacoes: cleanText(abastecimento.observacoes || ''),
-      rateio_info: abastecimento.rateioInfo ? JSON.stringify(abastecimento.rateioInfo) : null,
-      valor: valor,
-      created_by: cleanText(currentUser?.name || 'Unknown'),
-      created_at: new Date().toISOString()
-    };
-
-   
- // Inserir no Supabase
-    const { data, error } = await supabase
-      .from('abastecimentos')
-      .insert([newAbastecimento])
-      .select();
-
-    if (error) {
-      // 💡 ADICIONEI ESTE ALERT PARA VOCÊ VER O ERRO SE ALGO DER ERRADO
-      alert(`Erro do Banco: ${error.message}`); 
-      console.error("ERRO COMPLETO DO SUPABASE:", error);
-      addNotification('error', 'Erro ao salvar abastecimento no banco.');
-      return;
-    }
-
-    if (data) {
-      const dbRecord = data[0];
-      const localRecord = {
-          ...dbRecord,
-          rateioInfo: dbRecord.rateio_info ? JSON.parse(dbRecord.rateio_info) : undefined,
-          ccNovo: dbRecord.cc_novo,
-          areaLotacao: dbRecord.area_lotacao,
-          createdBy: dbRecord.created_by,
-          createdAt: dbRecord.created_at
-      };
-
-      setAbastecimentos(prev => [localRecord, ...prev]);
-      
-      if (localRecord.diretoria) {
-        setBudgets(prev => prev.map(b => 
-          b.diretoria === localRecord.diretoria 
-            ? { ...b, realizado: b.realizado + valor }
-            : b
-        ));
-      }
-      addNotification('success', 'Abastecimento salvo no banco com sucesso!');
-    }
+  const valor = abastecimento.litros * dieselPrice.price;
+  
+  const newAbastecimento = {
+    litros: abastecimento.litros,
+    cc_novo: cleanText(abastecimento.ccNovo),
+    diretoria: cleanText(abastecimento.diretoria),
+    gerencia: cleanText(abastecimento.gerencia),
+    area_lotacao: cleanText(abastecimento.areaLotacao),
+    fornecedor: cleanText(abastecimento.fornecedor),
+    equipamento: cleanText(abastecimento.equipamento),
+    area: cleanText(abastecimento.area),
+    semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
+    data: normalizeDateValue(abastecimento.data),
+    observacoes: cleanText(abastecimento.observacoes || ''),
+    rateio_info: abastecimento.rateioInfo ? JSON.stringify(abastecimento.rateioInfo) : null,
+    valor: valor,
+    created_by: cleanText(currentUser?.name || 'Unknown'),
+    created_at: new Date().toISOString()
   };
+
+  const { data, error } = await supabase
+    .from('abastecimentos')
+    .insert([newAbastecimento])
+    .select();
+
+  if (error) {
+    alert(`Erro do Banco: ${error.message}`);
+    console.error("ERRO SUPABASE:", error);
+    addNotification('error', 'Erro ao salvar abastecimento no banco.');
+    return;
+  }
+
+  if (data) {
+    const dbRecord = data[0];
+    const localRecord = mapAbastecimentoFromDb(dbRecord);
+    setAbastecimentos(prev => [localRecord, ...prev]);
+    
+    if (localRecord.diretoria) {
+      setBudgets(prev => prev.map(b => 
+        b.diretoria === localRecord.diretoria 
+          ? { ...b, realizado: b.realizado + valor }
+          : b
+      ));
+    }
+    addNotification('success', 'Abastecimento salvo com sucesso!');
+  }
+};
   // Update diesel price
   const handleUpdateDieselPrice = () => {
     const price = parseFloat(newDieselPrice);
