@@ -765,6 +765,9 @@ export default function App() {
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  // Adicione estes dois estados novos
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
   const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1321,6 +1324,68 @@ const handleResetPassword = async () => {
     setBudgets((prev) => [newBudget, ...prev]);
     addNotification('success', 'Orçamento cadastrado com sucesso!');
   }
+};
+
+  // Editar orçamento
+const handleEditBudget = async (budgetId: number, updated: Partial<Budget>) => {
+  const payload: any = {};
+
+  if (updated.diretoria !== undefined) {
+    payload.gerencia = cleanText(updated.diretoria);
+    payload.diretoria = cleanText(updated.diretoria);
+  }
+  if (updated.orcamento !== undefined) payload.orcamento = updated.orcamento;
+  if (updated.dataInicio !== undefined) payload.data_inicio = updated.dataInicio || null;
+  if (updated.dataFim !== undefined) payload.data_fim = updated.dataFim || null;
+  if (updated.dataInicio !== undefined || updated.dataFim !== undefined) {
+    payload.periodo = `${updated.dataInicio || ''} - ${updated.dataFim || ''}`;
+  }
+
+  const { error } = await supabase
+    .from('budgets')
+    .update(payload)
+    .eq('id', budgetId);
+
+  if (error) {
+    console.error('ERRO ao editar orçamento:', error);
+    addNotification('error', `Erro ao editar: ${error.message}`);
+    return;
+  }
+
+  setBudgets(prev =>
+    prev.map(b =>
+      b.id === budgetId
+        ? {
+            ...b,
+            ...updated,
+            periodo: `${updated.dataInicio || b.dataInicio} - ${updated.dataFim || b.dataFim}`,
+          }
+        : b
+    )
+  );
+
+  setShowEditBudgetModal(false);
+  setEditingBudget(null);
+  addNotification('success', 'Orçamento atualizado com sucesso!');
+};
+
+// Apagar orçamento
+const handleDeleteBudget = async (budgetId: number) => {
+  if (!window.confirm('Tem certeza que deseja excluir este orçamento?')) return;
+
+  const { error } = await supabase
+    .from('budgets')
+    .delete()
+    .eq('id', budgetId);
+
+  if (error) {
+    console.error('ERRO ao excluir orçamento:', error);
+    addNotification('error', `Erro ao excluir: ${error.message}`);
+    return;
+  }
+
+  setBudgets(prev => prev.filter(b => b.id !== budgetId));
+  addNotification('success', 'Orçamento excluído com sucesso!');
 };
 
   // Add abastecimento
@@ -3701,10 +3766,26 @@ const handleResetPassword = async () => {
                       })()}
                     </td>
                     <td className="py-3 px-4">
-                      <button className="text-slate-400 hover:text-red-800">
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    </td>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingBudget(b);
+                            setShowEditBudgetModal(true);
+                          }}
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600"
+                          title="Editar orçamento"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBudget(b.id)}
+                          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          title="Excluir orçamento"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+</td>
                   </tr>
                 ))
               ) : (
@@ -3726,6 +3807,130 @@ const handleResetPassword = async () => {
           <BudgetForm onAdd={handleAddBudget} />
         </div>
       </div>
+          {/* Modal de Edição de Orçamento */}
+    {showEditBudgetModal && editingBudget && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-blue-600" />
+              Editar Orçamento
+            </h3>
+            <button
+              onClick={() => {
+                setShowEditBudgetModal(false);
+                setEditingBudget(null);
+              }}
+              className="text-slate-400 hover:text-slate-600 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+    
+          {/* Formulário */}
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Gerência
+              </label>
+              <select
+                value={editingBudget.diretoria}
+                onChange={(e) =>
+                  setEditingBudget({ ...editingBudget, diretoria: e.target.value })
+                }
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Selecione a gerência...</option>
+                {sortTextValues([
+                  ...abastecimentos.map(a => a.gerencia),
+                  ...budgets.map(b => b.diretoria),
+                ]).map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+    
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Orçamento (R$)
+              </label>
+              <input
+                type="number"
+                value={editingBudget.orcamento}
+                onChange={(e) =>
+                  setEditingBudget({
+                    ...editingBudget,
+                    orcamento: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="Ex: 85000"
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              />
+            </div>
+    
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Data Início
+                </label>
+                <input
+                  type="date"
+                  value={editingBudget.dataInicio}
+                  onChange={(e) =>
+                    setEditingBudget({ ...editingBudget, dataInicio: e.target.value })
+                  }
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Data Fim
+                </label>
+                <input
+                  type="date"
+                  value={editingBudget.dataFim}
+                  onChange={(e) =>
+                    setEditingBudget({ ...editingBudget, dataFim: e.target.value })
+                  }
+                  className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+                />
+              </div>
+            </div>
+    
+            {/* Preview do valor */}
+            <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+              Orçamento: {' '}
+              <span className="font-semibold text-slate-800">
+                {formatCurrency(editingBudget.orcamento)}
+              </span>
+            </div>
+          </div>
+    
+          {/* Botões */}
+          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+            <button
+              onClick={() => {
+                setShowEditBudgetModal(false);
+                setEditingBudget(null);
+              }}
+              className="px-5 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition text-sm"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => handleEditBudget(editingBudget.id, editingBudget)}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition text-sm flex items-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              Salvar alterações
+            </button>
+          </div>
+    
+        </div>
+      </div>
+)}
     </div>
     );
   };
