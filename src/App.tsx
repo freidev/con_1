@@ -1937,50 +1937,164 @@ export default function App() {
     setDatabaseFilters((prev) => ({ ...prev, [key]: values }));
   };
 
-  const handleClearAllRecords = () => {
-    if (window.confirm('Tem certeza que deseja apagar TODOS os registros? Esta ação não pode ser desfeita.')) {
-      setAbastecimentos([]);
-      setBudgets(prev => prev.map(b => ({ ...b, realizado: 0 })));
-      addNotification('success', 'Base de dados limpa com sucesso!');
-    }
-  };
+  const handleClearAllRecords = async () => {
+  if (!window.confirm('Tem certeza que deseja apagar TODOS os registros? Esta ação não pode ser desfeita.')) {
+    return;
+  }
 
-  const handleDeleteRecord = (id: number) => {
-    const item = abastecimentos.find(a => a.id === id);
-    setAbastecimentos(prev => prev.filter(a => a.id !== id));
-    if (item && item.diretoria) {
-      setBudgets(prev => prev.map(b => 
-        b.diretoria === item.diretoria 
-          ? { ...b, realizado: Math.max(0, b.realizado - item.valor) }
+  // Deleta todos os registros do banco
+  const { error } = await supabase
+    .from('abastecimentos')
+    .delete()
+    .neq('id', 0); // Condição que afeta todos os registros
+
+  if (error) {
+    console.error('ERRO ao limpar base:', error);
+    addNotification('error', `Erro ao limpar base: ${error.message}`);
+    return;
+  }
+
+  // Zera o realizado de todos os budgets no banco
+  const { error: budgetError } = await supabase
+    .from('budgets')
+    .update({ realizado: 0 })
+    .neq('id', 0);
+
+  if (budgetError) {
+    console.error('ERRO ao zerar budgets:', budgetError);
+  }
+
+  // Atualiza o estado local
+  setAbastecimentos([]);
+  setBudgets(prev => prev.map(b => ({ ...b, realizado: 0 })));
+  addNotification('success', 'Base de dados limpa com sucesso!');
+};
+
+
+  const handleDeleteRecord = async (id: number) => {
+  const item = abastecimentos.find(a => a.id === id);
+  if (!item) return;
+
+  if (!window.confirm('Tem certeza que deseja excluir este registro?')) return;
+
+  // Deleta do banco
+  const { error } = await supabase
+    .from('abastecimentos')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('ERRO ao excluir registro:', error);
+    addNotification('error', `Erro ao excluir: ${error.message}`);
+    return;
+  }
+
+  // Atualiza estado local
+  setAbastecimentos(prev => prev.filter(a => a.id !== id));
+
+  // Atualiza orçamento
+  if (item.diretoria) {
+    // Atualiza o realizado no banco também
+    const budget = budgets.find(b => b.diretoria === item.diretoria);
+    if (budget) {
+      const novoRealizado = Math.max(0, budget.realizado - item.valor);
+
+      await supabase
+        .from('budgets')
+        .update({ realizado: novoRealizado })
+        .eq('id', budget.id);
+
+      setBudgets(prev => prev.map(b =>
+        b.diretoria === item.diretoria
+          ? { ...b, realizado: novoRealizado }
           : b
       ));
     }
-    addNotification('success', 'Registro excluído com sucesso!');
+  }
+
+  addNotification('success', 'Registro excluído com sucesso!');
+};
+
+  const handleSaveEditRecord = async (updated: Abastecimento) => {
+  const oldRecord = abastecimentos.find(a => a.id === updated.id);
+  const newValor = updated.litros * dieselPrice.price;
+
+  const payload = {
+    litros: updated.litros,
+    valor: newValor,
+    cc_novo: cleanText(updated.ccNovo),
+    diretoria: cleanText(updated.diretoria),
+    gerencia: cleanText(updated.gerencia),
+    area_lotacao: cleanText(updated.areaLotacao),
+    fornecedor: cleanText(updated.fornecedor),
+    equipamento: cleanText(updated.equipamento),
+    area: cleanText(updated.area),
+    semana: cleanText(updated.semana) || deriveWeekLabel(updated.data),
+    data: normalizeDateValue(updated.data),
+    observacoes: cleanText(updated.observacoes || ''),
+    rateio_info: updated.rateioInfo || null,
   };
 
-  const handleSaveEditRecord = (updated: Abastecimento) => {
-    const oldRecord = abastecimentos.find(a => a.id === updated.id);
-    const newValor = updated.litros * dieselPrice.price;
-    const saved: Abastecimento = {
-      ...updated,
-      valor: newValor,
-      semana: updated.semana || deriveWeekLabel(updated.data),
-    };
-    setAbastecimentos(prev => prev.map(a => a.id === saved.id ? saved : a));
+  // Atualiza no banco
+  const { error } = await supabase
+    .from('abastecimentos')
+    .update(payload)
+    .eq('id', updated.id);
 
-    // Ajusta orçamento: subtrai valor antigo, soma valor novo
-    if (oldRecord) {
-      setBudgets(prev => prev.map(b => {
-        let realizado = b.realizado;
-        if (b.diretoria === oldRecord.diretoria) realizado = Math.max(0, realizado - oldRecord.valor);
-        if (b.diretoria === saved.diretoria) realizado += newValor;
-        return { ...b, realizado };
-      }));
+  if (error) {
+    console.error('ERRO ao editar registro:', error);
+    addNotification('error', `Erro ao atualizar: ${error.message}`);
+    return;
+  }
+
+  // Atualiza estado local
+  const saved: Abastecimento = {
+    ...updated,
+    valor: newValor,
+    semana: updated.semana || deriveWeekLabel(updated.data),
+  };
+
+  setAbastecimentos(prev => prev.map(a => a.id === saved.id ? saved : a));
+
+  // Ajusta orçamento no banco e no estado local
+  if (oldRecord) {
+    const budgetsParaAtualizar = budgets.filter(b =>
+      b.diretoria === oldRecord.diretoria ||
+      b.diretoria === saved.diretoria
+    );
+
+    for (const b of budgetsParaAtualizar) {
+      let novoRealizado = b.realizado;
+
+      if (b.diretoria === oldRecord.diretoria) {
+        novoRealizado = Math.max(0, novoRealizado - oldRecord.valor);
+      }
+      if (b.diretoria === saved.diretoria) {
+        novoRealizado += newValor;
+      }
+
+      await supabase
+        .from('budgets')
+        .update({ realizado: novoRealizado })
+        .eq('id', b.id);
     }
 
-    setEditingRecord(null);
-    addNotification('success', 'Registro atualizado com sucesso!');
-  };
+    // Atualiza estado local dos budgets
+    setBudgets(prev => prev.map(b => {
+      let realizado = b.realizado;
+      if (b.diretoria === oldRecord.diretoria) {
+        realizado = Math.max(0, realizado - oldRecord.valor);
+      }
+      if (b.diretoria === saved.diretoria) {
+        realizado += newValor;
+      }
+      return { ...b, realizado };
+    }));
+  }
+
+  setEditingRecord(null);
+  addNotification('success', 'Registro atualizado com sucesso!');
+};
 
   const handleExportExcelFile = () => {
     if (exportPreview.rows.length === 0) {
