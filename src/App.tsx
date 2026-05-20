@@ -564,49 +564,30 @@ export default function App() {
   };
 }, []);
   
-         
-       // ✅ CORREÇÃO: Carregar rateios e budgets do Supabase no loadData()
-  useEffect(() => {
-  async function loadData() {
-    // Equipamentos
-    const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
-    if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
+            useEffect(() => {
+        async function loadData() {
+      // Carregar Equipamentos
+      const { data: eqData } = await supabase.from('equipamentos').select('*').order('id', { ascending: false });
+      if (eqData) setEquipments(eqData.map(mapEquipmentFromDb));
 
-    // Usuários
-    const { data: uData } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (uData && uData.length > 0) setUsers(uData.map(mapUserFromDb));
+      // Carregar Usuários
+      const { data: uData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (usersError) {
+        console.error('Erro ao carregar usuários:', usersError);
+      } else if (uData && uData.length > 0) {
+        setUsers(uData.map(mapUserFromDb));
+      }
 
-    // Abastecimentos
-    const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
-    if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
-
-    // ✅ Adicione estas duas linhas que estavam FALTANDO:
-    // Orçamentos (Aba 4)
-    const { data: budgetsData } = await supabase.from('budgets').select('*').order('id', { ascending: false });
-    if (budgetsData) setBudgets(budgetsData.map(b => ({
-      id: b.id,
-      gerencia: b.gerencia,
-      diretoria: b.diretoria,
-      periodo: b.periodo,
-      orcamento: b.orcamento,
-      realizado: b.realizado,
-      dataInicio: b.data_inicio,
-      dataFim: b.data_fim,
-      createdAt: b.created_at,
-    })));
-
-    // Rateios (Aba 5)
-    const { data: rateiosData } = await supabase.from('rateios').select('*').order('id', { ascending: false });
-    if (rateiosData) setRateios(rateiosData.map(r => ({
-      id: r.id,
-      equipment: r.equipment,
-      description: r.description,
-      items: typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []),
-      createdAt: r.created_at,
-    })));
-  }
-  loadData();
-}, []);
+      // Carregar Abastecimentos
+      const { data: absData } = await supabase.from('abastecimentos').select('*').order('id', { ascending: false });
+      if (absData) setAbastecimentos(absData.map(mapAbastecimentoFromDb));
+    }
+    loadData();
+  }, []);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -977,313 +958,171 @@ export default function App() {
     addNotification('info', 'Você saiu do sistema');
   };
 
- // Add equipment
-const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
-  const newEquipment = {
-    equipment: cleanText(equipment.equipment),
-    plate: cleanText(equipment.plate || ''),
-    cc_novo: equipment.ccNovo.map(cleanText).filter(Boolean),
-    gerencia: cleanText(equipment.gerencia),
-    area_lotacao: cleanText(equipment.areaLotacao),
-    area: cleanText(equipment.area),
-    fornecedor: cleanText(equipment.fornecedor),
-    created_at: new Date().toISOString(),
+  // Add equipment
+  const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
+    const newEquipment = {
+      ...equipment,
+      equipment: cleanText(equipment.equipment),
+      plate: cleanText(equipment.plate),
+      cc_novo: equipment.ccNovo.map(cleanText), // Mapear para nome da coluna no banco
+      gerencia: cleanText(equipment.gerencia),
+      area_lotacao: cleanText(equipment.areaLotacao),
+      area: cleanText(equipment.area),
+      fornecedor: cleanText(equipment.fornecedor),
+      created_at: new Date().toISOString()
+    };
+
+    // Inserir no Supabase
+    const { data, error } = await supabase
+      .from('equipamentos')
+      .insert([newEquipment])
+      .select();
+
+    if (data && !error) {
+      setEquipments(prev => [...prev, data[0] as any]);
+      setDatabaseTab('equipamentos');
+      setCurrentPage('database');
+      addNotification('success', 'Equipamento salvo no banco com sucesso!');
+    } else {
+      addNotification('error', 'Erro ao salvar equipamento no banco.');
+      console.error(error);
+    }
   };
 
-  const { data, error } = await supabase
-    .from('equipamentos')
-    .insert([newEquipment])
-    .select()
-    .single();
+  const handleUpdateEquipment = (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
+    if (!editingEquipment) return;
 
-  if (error) {
-    console.error('Erro detalhado ao salvar equipamento:', error);
-    addNotification('error', `Erro ao salvar equipamento: ${error.message}`);
-    return;
-  }
+    const updatedEquipment: Equipment = {
+      ...editingEquipment,
+      ...equipment,
+      equipment: cleanText(equipment.equipment),
+      plate: cleanText(equipment.plate),
+      ccNovo: equipment.ccNovo.map(cleanText).filter(Boolean),
+      gerencia: cleanText(equipment.gerencia),
+      areaLotacao: cleanText(equipment.areaLotacao),
+      area: cleanText(equipment.area),
+      fornecedor: cleanText(equipment.fornecedor),
+    };
 
-  const localEquipment: Equipment = {
-    id: data.id,
-    equipment: data.equipment,
-    plate: data.plate || '',
-    ccNovo: data.cc_novo || [],
-    gerencia: data.gerencia || '',
-    areaLotacao: data.area_lotacao || '',
-    area: data.area || '',
-    fornecedor: data.fornecedor || '',
-    createdAt: data.created_at,
+    setEquipments(prev => prev.map(item => item.id === editingEquipment.id ? updatedEquipment : item));
+    setEditingEquipment(null);
+    addNotification('success', 'Equipamento atualizado com sucesso!');
   };
 
-  setEquipments(prev => [...prev, localEquipment]);
-  setDatabaseTab('equipamentos');
-  setCurrentPage('database');
-  addNotification('success', 'Equipamento salvo no banco com sucesso!');
-};
-
- // ✅ CORREÇÃO: handleUpdateEquipment — salva no Supabase
-const handleUpdateEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
-  if (!editingEquipment) return;
-
-  const updated = {
-    equipment: cleanText(equipment.equipment),
-    plate: cleanText(equipment.plate),
-    cc_novo: equipment.ccNovo.map(cleanText).filter(Boolean),
-    gerencia: cleanText(equipment.gerencia),
-    area_lotacao: cleanText(equipment.areaLotacao),
-    area: cleanText(equipment.area),
-    fornecedor: cleanText(equipment.fornecedor),
+  const handleDeleteEquipment = (equipmentId: number) => {
+    if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
+    setEquipments(prev => prev.filter(item => item.id !== equipmentId));
+    setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
+    if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
+    addNotification('success', 'Equipamento excluído com sucesso!');
   };
 
-  const { error } = await supabase
-    .from('equipamentos')
-    .update(updated)
-    .eq('id', editingEquipment.id);
-
-  if (error) {
-    addNotification('error', 'Erro ao atualizar equipamento: ' + error.message);
-    console.error(error);
-    return;
-  }
-
-  setEquipments(prev => prev.map(item =>
-    item.id === editingEquipment.id
-      ? { ...item, ...equipment, ccNovo: updated.cc_novo, areaLotacao: updated.area_lotacao }
-      : item
-  ));
-  setEditingEquipment(null);
-  addNotification('success', 'Equipamento atualizado na nuvem!');
-};
-
-  // ✅ CORREÇÃO: handleDeleteEquipment — deleta no Supabase
-const handleDeleteEquipment = async (equipmentId: number) => {
-  if (!window.confirm('Tem certeza que deseja excluir este equipamento?')) return;
-
-  const { error } = await supabase
-    .from('equipamentos')
-    .delete()
-    .eq('id', equipmentId);
-
-  if (error) {
-    addNotification('error', 'Erro ao excluir equipamento: ' + error.message);
-    console.error(error);
-    return;
-  }
-
-  setEquipments(prev => prev.filter(item => item.id !== equipmentId));
-  setRateios(prev => prev.filter(rateio => rateio.equipmentId !== equipmentId));
-  if (editingEquipment?.id === equipmentId) setEditingEquipment(null);
-  addNotification('success', 'Equipamento excluído com sucesso!');
-};
   // Add rateio
-    // ✅ CORREÇÃO: handleAddRateio — salva no Supabase
-    const handleAddRateio = async (
-  rateio: Omit<Rateio, 'id' | 'createdAt'>
-) => {
-  const newRateio = {
-    equipment: cleanText(rateio.equipment),
-    description: cleanText(rateio.description),
-    items: rateio.items.map(item => ({
-      ...item,
-      gerencia: cleanText(item.gerencia),
-      ccNovo: cleanText(item.ccNovo),
-      description: cleanText(item.description),
-    })),
-    created_at: new Date().toISOString(),
+  const handleAddRateio = (rateio: Omit<Rateio, 'id' | 'createdAt'>) => {
+    const newRateio: Rateio = {
+      ...rateio,
+      equipment: cleanText(rateio.equipment),
+      description: cleanText(rateio.description),
+      items: rateio.items.map((item) => ({
+        ...item,
+        gerencia: cleanText(item.gerencia),
+        ccNovo: cleanText(item.ccNovo),
+        description: cleanText(item.description),
+      })),
+      id: Date.now(),
+      createdAt: new Date().toISOString()
+    };
+    setRateios(prev => [...prev, newRateio]);
+    addNotification('success', 'Rateio cadastrado com sucesso!');
   };
-
-  const { data, error } = await supabase
-    .from('rateios')
-    .insert([newRateio])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro detalhado ao salvar rateio:', error);
-    addNotification('error', `Erro ao salvar rateio: ${error.message}`);
-    return;
-  }
-
-  const localRateio: Rateio = {
-    id: data.id,
-    equipment: data.equipment,
-    description: data.description,
-    items: data.items || [],
-    createdAt: data.created_at,
-  };
-
-  setRateios(prev => [...prev, localRateio]);
-  setShowRateioForm(false);
-  addNotification('success', 'Rateio salvo no banco com sucesso!');
-};
 
   // Add budget
-  // ✅ CORREÇÃO: handleAddBudget — salva no Supabase
-  const handleAddBudget = async (
-    budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>
-  ) => {
-    const newBudget = {
-      gerencia: cleanText(budget.gerencia),
-      diretoria: cleanText(budget.diretoria || ''),
+  const handleAddBudget = (budget: Omit<Budget, 'id' | 'createdAt' | 'realizado'>) => {
+    const newBudget: Budget = {
+      ...budget,
+      diretoria: cleanText(budget.diretoria),
       periodo: cleanText(budget.periodo),
-      orcamento: Number(budget.orcamento),
+      id: Date.now(),
       realizado: 0,
-      data_inicio: budget.dataInicio || null,
-      data_fim: budget.dataFim || null,
-      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     };
-  
-    const { data, error } = await supabase
-      .from('budgets')
-      .insert([newBudget])
-      .select()
-      .single();
-  
-    if (error) {
-      console.error('Erro detalhado ao salvar orçamento:', error);
-      addNotification('error', `Erro ao salvar orçamento: ${error.message}`);
-      return;
-    }
-  
-    const localBudget: Budget = {
-      id: data.id,
-      gerencia: data.gerencia,
-      diretoria: data.diretoria,
-      periodo: data.periodo,
-      orcamento: Number(data.orcamento),
-      realizado: Number(data.realizado),
-      dataInicio: data.data_inicio,
-      dataFim: data.data_fim,
-      createdAt: data.created_at,
-    };
-  
-    setBudgets(prev => [...prev, localBudget]);
-    addNotification('success', 'Orçamento salvo no banco com sucesso!');
+    setBudgets(prev => [...prev, newBudget]);
+    addNotification('success', 'Orçamento cadastrado! Dashboard atualizado automaticamente.');
   };
-    
+
   // Add abastecimento
- const handleAddAbastecimento = async (
-  abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>
-) => {
-  const valor = Number(abastecimento.litros) * Number(dieselPrice.price);
+  const handleAddAbastecimento = async (abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>) => {
+    const valor = abastecimento.litros * dieselPrice.price;
+    const newAbastecimento = {
+      ...abastecimento,
+      cc_novo: cleanText(abastecimento.ccNovo),
+      diretoria: cleanText(abastecimento.diretoria),
+      gerencia: cleanText(abastecimento.gerencia),
+      area_lotacao: cleanText(abastecimento.areaLotacao),
+      fornecedor: cleanText(abastecimento.fornecedor),
+      equipamento: cleanText(abastecimento.equipamento),
+      area: cleanText(abastecimento.area),
+      semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
+      data: normalizeDateValue(abastecimento.data),
+      observacoes: cleanText(abastecimento.observacoes || ''),
+      rateio_info: abastecimento.rateioInfo ? JSON.stringify(abastecimento.rateioInfo) : null,
+      valor,
+      created_by: cleanText(currentUser?.name || 'Unknown'),
+      created_at: new Date().toISOString()
+    };
 
-  const newAbastecimento = {
-    cc_novo: cleanText(abastecimento.ccNovo),
-    diretoria: cleanText(abastecimento.diretoria),
-    gerencia: cleanText(abastecimento.gerencia),
-    area_lotacao: cleanText(abastecimento.areaLotacao),
-    fornecedor: cleanText(abastecimento.fornecedor),
-    equipamento: cleanText(abastecimento.equipamento),
-    area: cleanText(abastecimento.area),
-    semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
-    data: normalizeDateValue(abastecimento.data),
-    litros: Number(abastecimento.litros),
-    valor,
-    observacoes: cleanText(abastecimento.observacoes || ''),
-    rateio_info: abastecimento.rateioInfo
-      ? JSON.stringify(abastecimento.rateioInfo)
-      : null,
-    created_by: cleanText(currentUser?.name || 'Unknown'),
-    created_at: new Date().toISOString(),
+    // Inserir no Supabase
+    const { data, error } = await supabase
+      .from('abastecimentos')
+      .insert([newAbastecimento])
+      .select();
+
+    if (data && !error) {
+      const dbRecord = data[0];
+      // Ajustar formato para o estado local
+      const localRecord = {
+          ...dbRecord,
+          rateioInfo: dbRecord.rateio_info ? JSON.parse(dbRecord.rateio_info) : undefined,
+          ccNovo: dbRecord.cc_novo,
+          areaLotacao: dbRecord.area_lotacao,
+          createdBy: dbRecord.created_by,
+          createdAt: dbRecord.created_at
+      };
+
+      setAbastecimentos(prev => [localRecord, ...prev]);
+      
+      // Update budget realizado
+      if (localRecord.diretoria) {
+        setBudgets(prev => prev.map(b => 
+          b.diretoria === localRecord.diretoria 
+            ? { ...b, realizado: b.realizado + valor }
+            : b
+        ));
+      }
+      
+      addNotification('success', 'Abastecimento salvo no banco com sucesso!');
+    } else {
+      addNotification('error', 'Erro ao salvar abastecimento no banco.');
+      console.error(error);
+    }
   };
-
-  const { data, error } = await supabase
-    .from('abastecimentos')
-    .insert([newAbastecimento])
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro detalhado ao salvar abastecimento:', error);
-    addNotification('error', `Erro ao salvar abastecimento: ${error.message}`);
-    return;
-  }
-
-  const localRecord: Abastecimento = {
-    id: data.id,
-    ccNovo: data.cc_novo,
-    diretoria: data.diretoria,
-    gerencia: data.gerencia,
-    areaLotacao: data.area_lotacao,
-    fornecedor: data.fornecedor,
-    equipamento: data.equipamento,
-    area: data.area,
-    semana: data.semana,
-    data: data.data,
-    litros: Number(data.litros),
-    valor: Number(data.valor),
-    observacoes: data.observacoes || '',
-    rateioInfo: data.rateio_info ? JSON.parse(data.rateio_info) : undefined,
-    createdBy: data.created_by,
-    createdAt: data.created_at,
-  };
-
-  setAbastecimentos(prev => [localRecord, ...prev]);
-
-  if (localRecord.diretoria) {
-    setBudgets(prev =>
-      prev.map(b =>
-        b.diretoria === localRecord.diretoria
-          ? { ...b, realizado: b.realizado + valor }
-          : b
-      )
-    );
-  }
-
-  addNotification('success', 'Abastecimento salvo no banco com sucesso!');
-};
 
   // Update diesel price
-  const handleUpdateDieselPrice = async () => {
-  const price = parseFloat(newDieselPrice);
+  const handleUpdateDieselPrice = () => {
+    const price = parseFloat(newDieselPrice);
+    if (isNaN(price) || price <= 0) {
+      addNotification('error', 'Preço inválido');
+      return;
+    }
 
-  if (isNaN(price) || price <= 0) {
-    addNotification('error', 'Preço inválido');
-    return;
-  }
+    const newDiesel = {
+      id: 1,
+      price,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser?.username || 'unknown'
+    };
 
-  const updatedDiesel = {
-    price,
-    updated_at: new Date().toISOString(),
-    updated_by: currentUser?.username || 'unknown',
-  };
-
-  const { data, error } = await supabase
-    .from('diesel_prices')
-    .upsert(
-      {
-        id: 1,
-        ...updatedDiesel,
-      },
-      { onConflict: 'id' }
-    )
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Erro detalhado ao salvar diesel:', error);
-    addNotification('error', `Erro ao salvar diesel: ${error.message}`);
-    return;
-  }
-
-  const newDiesel = {
-    id: data.id,
-    price: Number(data.price),
-    updatedAt: data.updated_at,
-    updatedBy: data.updated_by,
-  };
-
-  setDieselPrice(newDiesel);
-
-  setAbastecimentos(prev =>
-    prev.map(a => ({
-      ...a,
-      valor: a.litros * price,
-    }))
-  );
-
-  setNewDieselPrice('');
-  addNotification('success', 'Preço do diesel salvo no Supabase!');
-};
+    setDieselPrice(newDiesel);
 
     // Recalcula o valor de todos os abastecimentos com o novo preço
     setAbastecimentos(prev => prev.map(a => ({
