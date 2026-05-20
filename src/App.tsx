@@ -4250,11 +4250,14 @@ onAdd={async (r: any) => {
           </div>
           <div className="relative w-full max-w-full xl:justify-self-end">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar equipamento..."
-              className="w-full max-w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm outline-none focus:border-red-800 focus:ring-2 focus:ring-red-800/20"
-            />
+            // ✅ CORRIGIDO - Conectado ao estado equipmentSearch
+<input
+  type="text"
+  value={equipmentSearch}
+  onChange={(e) => setEquipmentSearch(e.target.value)}
+  placeholder="Buscar equipamento..."
+  className="w-full max-w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm outline-none focus:border-red-800 focus:ring-2 focus:ring-red-800/20"
+/>
           </div>
         </div>
 
@@ -4643,7 +4646,12 @@ onAdd={async (r: any) => {
             <Plus className="w-5 h-5 text-red-800" />
             Preenchimento de Abastecimento
           </h3>
-          <p className="text-sm text-slate-500">Próximo ID: {abastecimentos.length + 1}</p>
+           // ✅ CORRIGIDO - Mostra o próximo ID real baseado no maior ID existente
+<p className="text-sm text-slate-500">
+  Próximo ID: {abastecimentos.length > 0
+    ? Math.max(...abastecimentos.map(a => a.id)) + 1
+    : 1}
+</p>
         </div>
 
         <PreenchimentoForm 
@@ -5223,21 +5231,54 @@ onAdd={async (r: any) => {
       addNotification('success', 'Foto de perfil atualizada e salva na nuvem!');
     };
 
-    const handleDeleteProfile = () => {
-      if (deleteConfirm !== currentUser?.username) {
-        addNotification('error', 'Usuário digitado não confere');
-        return;
-      }
-      handleLogout();
-      setUsers(prev => prev.filter(u => u.id !== currentUser?.id));
-      addNotification('info', 'Perfil excluído com sucesso.');
-    };
+    // ✅ CORRIGIDO - Deleta do banco e do estado
+        const handleDeleteProfile = async () => {
+          if (deleteConfirm !== currentUser?.username) {
+            addNotification('error', 'Usuário digitado não confere');
+            return;
+          }
+        
+          if (!currentUser?.id) return;
+        
+          const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', currentUser.id);
+        
+          if (error) {
+            console.error('ERRO ao excluir perfil:', error);
+            addNotification('error', `Erro ao excluir perfil: ${error.message}`);
+            return;
+          }
+        
+          setUsers(prev => prev.filter(u => u.id !== currentUser.id));
+          handleLogout();
+          addNotification('info', 'Perfil excluído com sucesso.');
+        };
 
-    const handleRemoveAvatar = () => {
-      setUsers(prev => prev.map(u => u.id === currentUser?.id ? { ...u, avatar: undefined } : u));
-      setCurrentUser(prev => prev ? { ...prev, avatar: undefined } : null);
-      addNotification('success', 'Foto de perfil removida!');
-    };
+    // ✅ CORRIGIDO - Remove do banco e do estado
+const handleRemoveAvatar = async () => {
+  if (!currentUser?.id) return;
+
+  const { error } = await supabase
+    .from('users')
+    .update({ avatar: null })
+    .eq('id', currentUser.id);
+
+  if (error) {
+    console.error('ERRO ao remover avatar:', error);
+    addNotification('error', `Erro ao remover foto: ${error.message}`);
+    return;
+  }
+
+  setUsers(prev =>
+    prev.map(u =>
+      u.id === currentUser.id ? { ...u, avatar: undefined } : u
+    )
+  );
+  setCurrentUser(prev => prev ? { ...prev, avatar: undefined } : null);
+  addNotification('success', 'Foto de perfil removida!');
+};
 
     return (
       <div className="max-w-2xl mx-auto space-y-6">
