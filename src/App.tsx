@@ -4262,14 +4262,15 @@ onAdd={async (r: any) => {
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 overflow-hidden">
         <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),320px] xl:items-center">
-          <div className="min-w-0 max-w-full">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800 break-words">
+          <div className="mb-6">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
               <Wrench className="h-5 w-5 shrink-0 text-red-800" />
               <span>Cadastro de Equipamentos</span>
             </h3>
-            <p className="mt-1 text-sm text-slate-500">{equipments.length} equipamento(s) cadastrado(s)
+            <p className="mt-1 text-sm text-slate-500">
+              {equipments.length} equipamento(s) cadastrado(s)
             </p>
-        </div>
+          </div>
 
         <EquipmentForm
           key={editingEquipment ? `edit-${editingEquipment.id}` : 'new-equipment'}
