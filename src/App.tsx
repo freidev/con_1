@@ -4262,15 +4262,24 @@ onAdd={async (r: any) => {
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6 overflow-hidden">
         <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr),320px] xl:items-center">
-          <div className="mb-6">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+          <div className="min-w-0 max-w-full">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800 break-words">
               <Wrench className="h-5 w-5 shrink-0 text-red-800" />
               <span>Cadastro de Equipamentos</span>
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {equipments.length} equipamento(s) cadastrado(s)
-            </p>
+            <p className="mt-1 text-sm text-slate-500">{equipments.length} equipamento(s) cadastrado(s)</p>
           </div>
+          <div className="relative w-full max-w-full xl:justify-self-end">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+<input
+  type="text"
+  value={equipmentSearch}
+  onChange={(e) => setEquipmentSearch(e.target.value)}
+  placeholder="Buscar equipamento..."
+  className="w-full max-w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm outline-none focus:border-red-800 focus:ring-2 focus:ring-red-800/20"
+/>
+          </div>
+        </div>
 
         <EquipmentForm
           key={editingEquipment ? `edit-${editingEquipment.id}` : 'new-equipment'}
