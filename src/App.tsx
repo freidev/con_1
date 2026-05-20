@@ -537,27 +537,148 @@ export default function App() {
 
   // Supabase Data Fetching
  useEffect(() => {
-  const channel = supabase
-    .channel('users-realtime')
+   // =============================================
+  // REALTIME - Atualiza tudo automaticamente
+  // =============================================
+
+  // 1. USERS
+  const usersChannel = supabase
+    .channel('realtime-users')
     .on(
       'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'users',
-      },
+      { event: '*', schema: 'public', table: 'users' },
       async () => {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('users')
           .select('*')
           .order('created_at', { ascending: false });
+        if (data) setUsers(data.map(mapUserFromDb));
+      }
+    )
+    .subscribe();
 
-        if (!error && data) {
-          setUsers(data.map(mapUserFromDb));
+  // 2. ABASTECIMENTOS
+  const absChannel = supabase
+    .channel('realtime-abastecimentos')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'abastecimentos' },
+      async () => {
+        const { data } = await supabase
+          .from('abastecimentos')
+          .select('*')
+          .order('id', { ascending: false });
+        if (data) setAbastecimentos(data.map(mapAbastecimentoFromDb));
+      }
+    )
+    .subscribe();
+
+  // 3. EQUIPAMENTOS
+  const eqChannel = supabase
+    .channel('realtime-equipamentos')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'equipamentos' },
+      async () => {
+        const { data } = await supabase
+          .from('equipamentos')
+          .select('*')
+          .order('id', { ascending: false });
+        if (data) setEquipments(data.map(mapEquipmentFromDb));
+      }
+    )
+    .subscribe();
+
+  // 4. BUDGETS
+  const budgetsChannel = supabase
+    .channel('realtime-budgets')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'budgets' },
+      async () => {
+        const { data } = await supabase
+          .from('budgets')
+          .select('*')
+          .order('id', { ascending: false });
+        if (data) {
+          setBudgets(data.map((b: any) => ({
+            id: b.id,
+            gerencia: b.gerencia ?? '',
+            diretoria: b.diretoria ?? b.gerencia ?? '',
+            periodo: b.periodo ?? '',
+            orcamento: Number(b.orcamento) || 0,
+            realizado: Number(b.realizado) || 0,
+            dataInicio: b.data_inicio ?? '',
+            dataFim: b.data_fim ?? '',
+            createdAt: b.created_at ?? new Date().toISOString(),
+          })));
         }
       }
     )
     .subscribe();
+
+  // 5. RATEIOS
+  const raiteiosChannel = supabase
+    .channel('realtime-rateios')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'rateios' },
+      async () => {
+        const { data } = await supabase
+          .from('rateios')
+          .select('*')
+          .order('id', { ascending: false });
+        if (data) {
+          setRateios(data.map((r: any) => ({
+            id: r.id,
+            equipmentId: r.equipment_id ?? 0,
+            equipment: r.equipment ?? '',
+            description: r.description ?? '',
+            items: typeof r.items === 'string'
+              ? JSON.parse(r.items)
+              : (r.items || []),
+            createdAt: r.created_at ?? new Date().toISOString(),
+          })));
+        }
+      }
+    )
+    .subscribe();
+
+  // 6. DIESEL PRICES
+  const dieselChannel = supabase
+    .channel('realtime-diesel')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'diesel_prices' },
+      async () => {
+        const { data } = await supabase
+          .from('diesel_prices')
+          .select('*')
+          .order('id', { ascending: false })
+          .limit(1);
+        if (data && data.length > 0) {
+          const dp = data[0];
+          setDieselPrice({
+            id: dp.id,
+            price: Number(dp.price) || 7.38,
+            updatedAt: dp.updated_at ?? new Date().toISOString(),
+            updatedBy: dp.updated_by ?? 'admin',
+          });
+        }
+      }
+    )
+    .subscribe();
+
+  // Cleanup - Remove todos os canais ao sair da página
+  return () => {
+    supabase.removeChannel(usersChannel);
+    supabase.removeChannel(absChannel);
+    supabase.removeChannel(eqChannel);
+    supabase.removeChannel(budgetsChannel);
+    supabase.removeChannel(raiteiosChannel);
+    supabase.removeChannel(dieselChannel);
+  };
+}, []);
 
   return () => {
     supabase.removeChannel(channel);
