@@ -957,34 +957,70 @@ export default function App() {
     setRegRole('operator');
   };
   // Forgot password handlers
-  const handleForgotPasswordEmail = () => {
-    const emailNormalizado = cleanText(forgotEmail).toLowerCase();
-    if (!emailNormalizado) {
-      addNotification('error', 'Digite seu e-mail');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
-      addNotification('error', 'Digite um e-mail válido');
-      return;
-    }
-    const user = users.find(u => (u.email || '').toLowerCase() === emailNormalizado);
-    if (!user) {
-      addNotification('error', 'Não encontramos uma conta com este e-mail');
-      return;
-    }
-    if (user.status !== 'approved') {
-      addNotification('warning', 'Esta conta ainda não foi aprovada pelo administrador');
-      return;
-    }
+  const handleForgotPasswordEmail = async () => {
+  const emailNormalizado = cleanText(forgotEmail).toLowerCase();
 
-    // Gera código de 6 dígitos
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = Date.now() + 10 * 60 * 1000; // expira em 10 minutos
-    setGeneratedCode(code);
-    setCodeExpiresAt(expiresAt);
-    setForgotUserId(user.id);
-    setForgotStep('code');
-    setEnteredCode('');
+  if (!emailNormalizado) {
+    addNotification('error', 'Digite seu e-mail');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+    addNotification('error', 'Digite um e-mail válido');
+    return;
+  }
+
+  const user = users.find(
+    u => (u.email || '').toLowerCase() === emailNormalizado
+  );
+
+  if (!user) {
+    addNotification('error', 'Não encontramos uma conta com este e-mail');
+    return;
+  }
+  if (user.status !== 'approved') {
+    addNotification('warning', 'Esta conta ainda não foi aprovada');
+    return;
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+
+  setGeneratedCode(code);
+  setCodeExpiresAt(expiresAt);
+  setForgotUserId(user.id);
+  setForgotStep('code');
+  setEnteredCode('');
+
+  addNotification('info', 'Enviando código para o seu e-mail...');
+
+  try {
+    const { default: emailjs } = await import('@emailjs/browser');
+
+    await emailjs.send(
+      'service_q5ttlda',
+      'template_re205kc',
+      {
+        to_email: emailNormalizado,
+        user_name: user.name || user.username,
+        code: code,
+        app_name: 'Controle de Abastecimento - Stratos',
+      },
+      'pYgxhmfHC5Beyerda'
+    );
+
+    addNotification(
+      'success',
+      `Código enviado para ${emailNormalizado}! Verifique sua caixa de entrada.`
+    );
+
+  } catch (err) {
+    console.error('Erro ao enviar e-mail:', err);
+    addNotification(
+      'warning',
+      `Não foi possível enviar o e-mail. Código temporário: ${code}`
+    );
+  }
+};
 
     // Em produção, esse código seria enviado por e-mail real.
     // Aqui simulamos exibindo na notificação e no console.
@@ -1014,17 +1050,47 @@ export default function App() {
     addNotification('success', 'Código verificado com sucesso! Defina sua nova senha.');
   };
 
-  const handleResendCode = () => {
-    const user = users.find(u => u.id === forgotUserId);
-    if (!user) return;
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = Date.now() + 10 * 60 * 1000;
-    setGeneratedCode(code);
-    setCodeExpiresAt(expiresAt);
-    setEnteredCode('');
-    console.log(`[Recuperação de senha] Novo código para ${user.email}: ${code}`);
-    addNotification('success', `Novo código enviado! Código: ${code} (válido por 10 min)`);
-  };
+  const handleResendCode = async () => {
+  const user = users.find(u => u.id === forgotUserId);
+  if (!user) return;
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+
+  setGeneratedCode(code);
+  setCodeExpiresAt(expiresAt);
+  setEnteredCode('');
+
+  addNotification('info', 'Reenviando código...');
+
+  try {
+    const { default: emailjs } = await import('@emailjs/browser');
+
+    await emailjs.send(
+      'service_q5ttlda',
+      'template_re205kc',
+      {
+        to_email: (user.email || '').toLowerCase(),
+        user_name: user.name || user.username,
+        code: code,
+        app_name: 'Controle de Abastecimento - Stratos',
+      },
+      'pYgxhmfHC5Beyerda'
+    );
+
+    addNotification(
+      'success',
+      `Novo código enviado para ${user.email}!`
+    );
+
+  } catch (err) {
+    console.error('Erro ao reenviar e-mail:', err);
+    addNotification(
+      'warning',
+      `Erro ao enviar. Código temporário: ${code}`
+    );
+  }
+};
 
   // ✅ CORRIGIDO - Salva no banco e no estado
 const handleResetPassword = async () => {
