@@ -6395,20 +6395,20 @@ const handleRemoveAvatar = async () => {
               </button>
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:tracking-[0.22em]">Painel de controle</p>
-                <h2 className="mt-1 truncate text-2xl font-semibold text-slate-900">
-                    {(() => {
-                      const extraPages: Record<string, string> = {
-                        profile: 'Meu Perfil',
-                        diesel: 'Valor Diesel',
-                      };
-                      return (
-                        extraPages[currentPage] ||
-                        [...navItems, ...adminNavItems]
-                          .find(item => item.id === currentPage)?.label ||
-                        'Sistema'
-                      );
-                    })()}
-                  </h2>
+               <h2 className="mt-1 truncate text-2xl font-semibold text-slate-900">
+                  {currentPage === 'profile' ? 'Meu Perfil' :
+                   currentPage === 'diesel' ? 'Valor Diesel' :
+                   currentPage === 'dashboard' ? 'Dashboard' :
+                   currentPage === 'database' ? 'Base de Dados' :
+                   currentPage === 'budget' ? 'Orçamento' :
+                   currentPage === 'rateio' ? 'Rateio CC' :
+                   currentPage === 'equipments' ? 'Equipamentos' :
+                   currentPage === 'history' ? 'Histórico' :
+                   currentPage === 'preenchimento' ? 'Preenchimento' :
+                   currentPage === 'import' ? 'Importação' :
+                   currentPage === 'export' ? 'Exportação' :
+                   currentPage === 'users' ? 'Usuários' : 'Sistema'}
+                </h2>
               </div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-slate-600 sm:gap-3">
