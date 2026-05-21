@@ -3746,7 +3746,7 @@ const handleDeleteBudget = async (budgetId: number) => {
                   </p>
                 </div>
               );
-            })()
+            })()}
         </div>
 
         <div className="overflow-x-auto mb-8">
