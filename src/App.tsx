@@ -2079,32 +2079,42 @@ const handleDeleteBudget = async (budgetId: number) => {
       };
     }
 
-    const filteredBudgets = budgets.filter((budget) =>
-      filters.diretoria.length === 0 || filters.diretoria.includes(budget.diretoria),
-    );
+   // --- ORÇADO VS REALIZADO (corrigido) ---
+const filteredBudgets = budgets.filter(
+  (b) => filters.gerencia.length === 0 || filters.gerencia.includes(b.gerencia),
+);
 
-    const rows = filteredBudgets.map((budget) => {
-      const saldo = budget.orcamento - budget.realizado;
-      const execucao = budget.orcamento > 0 ? (budget.realizado / budget.orcamento) * 100 : 0;
-      return {
-        DIRETORIA: budget.diretoria,
-        'ORÇAMENTO (R$)': budget.orcamento.toFixed(2),
-        'REALIZADO (R$)': budget.realizado.toFixed(2),
-        'SALDO (R$)': saldo.toFixed(2),
-        '% EXECUÇÃO': `${execucao.toFixed(1)}%`,
-        STATUS: saldo >= 0 ? 'Dentro do Orçamento' : 'Acima do Orçamento',
-      };
-    });
+// Calcula REALIZADO sempre do jeito certo: somando filteredAbastecimentos
+const realizadoPorGerencia = filteredAbastecimentos.reduce<Record<string, number>>((acc, a) => {
+  const g = a.gerencia || '';
+  if (!g) return acc;
+  acc[g] = (acc[g] || 0) + a.valor;
+  return acc;
+}, {});
 
-    return {
-      rows,
-      columns: ['DIRETORIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
-      sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
-      records: rows.length,
-      litros: 0,
-      valor: filteredBudgets.reduce((sum, item) => sum + item.realizado, 0),
-    };
-  }, [exportFormat, filteredAbastecimentos, budgets, filters.diretoria, selectedBaseColumns]);
+const rows = filteredBudgets.map((budget) => {
+  const realizado = realizadoPorGerencia[budget.gerencia] || 0;
+  const saldo = budget.orcamento - realizado;
+  const execucao = budget.orcamento > 0 ? (realizado / budget.orcamento) * 100 : 0;
+
+  return {
+    GERÊNCIA: budget.gerencia, // pode trocar o label pra "DIRETORIA" se quiser
+    'ORÇAMENTO (R$)': budget.orcamento.toFixed(2),
+    'REALIZADO (R$)': realizado.toFixed(2),
+    'SALDO (R$)': saldo.toFixed(2),
+    '% EXECUÇÃO': `${execucao.toFixed(1)}%`,
+    STATUS: saldo >= 0 ? 'Dentro do Orçamento' : 'Acima do Orçamento',
+  };
+});
+
+return {
+  rows,
+  columns: ['GERÊNCIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
+  sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
+  records: rows.length,
+  litros: 0,
+  valor: rows.reduce((sum: number, r: any) => sum + Number(r['REALIZADO (R$)'] || 0), 0),
+};
 
   const databaseFilterFields: Array<{
     key: keyof DatabaseFilterState;
