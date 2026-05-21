@@ -6470,3 +6470,4 @@ const handleRemoveAvatar = async () => {
       </div>
     </div>
   );
+}
