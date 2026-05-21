@@ -2084,7 +2084,10 @@ const filteredBudgets = budgets.filter(
   (b) => filters.gerencia.length === 0 || filters.gerencia.includes(b.gerencia),
 );
 
-// Calcula REALIZADO sempre do jeito certo: somando filteredAbastecimentos
+// Gerências que entram no relatório
+const gerenciasSet = new Set(filteredBudgets.map((b) => b.gerencia).filter(Boolean));
+
+// Soma REALIZADO por gerência (R$)
 const realizadoPorGerencia = filteredAbastecimentos.reduce<Record<string, number>>((acc, a) => {
   const g = a.gerencia || '';
   if (!g) return acc;
@@ -2092,13 +2095,18 @@ const realizadoPorGerencia = filteredAbastecimentos.reduce<Record<string, number
   return acc;
 }, {});
 
+// Soma LITROS total apenas dessas gerências
+const totalLitrosOrcado = filteredAbastecimentos
+  .filter((a) => gerenciasSet.has(a.gerencia))
+  .reduce((sum, a) => sum + (Number(a.litros) || 0), 0);
+
 const rows = filteredBudgets.map((budget) => {
   const realizado = realizadoPorGerencia[budget.gerencia] || 0;
   const saldo = budget.orcamento - realizado;
   const execucao = budget.orcamento > 0 ? (realizado / budget.orcamento) * 100 : 0;
 
   return {
-    GERÊNCIA: budget.gerencia, // pode trocar o label pra "DIRETORIA" se quiser
+    GERÊNCIA: budget.gerencia,
     'ORÇAMENTO (R$)': budget.orcamento.toFixed(2),
     'REALIZADO (R$)': realizado.toFixed(2),
     'SALDO (R$)': saldo.toFixed(2),
@@ -2107,14 +2115,19 @@ const rows = filteredBudgets.map((budget) => {
   };
 });
 
+const totalValorOrcado = rows.reduce(
+  (sum: number, r: any) => sum + Number(r['REALIZADO (R$)'] || 0),
+  0,
+);
+
 return {
-    rows,
-    columns: ['GERÊNCIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
-    sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
-    records: rows.length,
-    litros: 0,
-    valor: rows.reduce((sum: number, r: any) => sum + Number(r['REALIZADO (R$)'] || 0), 0),
-  };
+  rows,
+  columns: ['GERÊNCIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
+  sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
+  records: rows.length,
+  litros: totalLitrosOrcado,      // ✅ agora aparece
+  valor: totalValorOrcado,        // ✅ já estava certo
+};
 }, [exportFormat, filteredAbastecimentos, budgets, filters.diretoria, selectedBaseColumns]);
 
   const databaseFilterFields: Array<{
