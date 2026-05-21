@@ -2108,13 +2108,14 @@ const rows = filteredBudgets.map((budget) => {
 });
 
 return {
-  rows,
-  columns: ['GERÊNCIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
-  sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
-  records: rows.length,
-  litros: 0,
-  valor: rows.reduce((sum: number, r: any) => sum + Number(r['REALIZADO (R$)'] || 0), 0),
-};
+    rows,
+    columns: ['GERÊNCIA', 'ORÇAMENTO (R$)', 'REALIZADO (R$)', 'SALDO (R$)', '% EXECUÇÃO', 'STATUS'],
+    sheetNames: [currentFormat.sheetName, 'INFORMAÇÕES'],
+    records: rows.length,
+    litros: 0,
+    valor: rows.reduce((sum: number, r: any) => sum + Number(r['REALIZADO (R$)'] || 0), 0),
+  };
+}, [exportFormat, filteredAbastecimentos, budgets, filters.diretoria, selectedBaseColumns]);
 
   const databaseFilterFields: Array<{
     key: keyof DatabaseFilterState;
