@@ -3723,15 +3723,30 @@ const handleDeleteBudget = async (budgetId: number) => {
               )}
             </p>
           </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <p className="text-sm text-green-600 mb-1">Situação</p>
-            <p className="text-lg font-bold text-green-800">Dentro do Orçamento</p>
-            <p className="text-xs text-green-600">
-              {budgets.reduce((sum, b) => sum + b.orcamento, 0) > 0 
-                ? `${formatNumber((budgets.reduce((sum, b) => sum + b.realizado, 0) / budgets.reduce((sum, b) => sum + b.orcamento, 0)) * 100, 2)}% executado`
-                : '0% executado'}
-            </p>
-          </div>
+         {(() => {
+              const totalOrcado = budgets.reduce((sum, b) => sum + b.orcamento, 0);
+              const totalRealizado = budgets.reduce((sum, b) => {
+                return sum + budgetFilteredAbastecimentos
+                  .filter(a => a.gerencia === b.diretoria)
+                  .reduce((acc, curr) => acc + curr.valor, 0);
+              }, 0);
+              const percentual = totalOrcado > 0 ? (totalRealizado / totalOrcado) * 100 : 0;
+              const isDentro = totalRealizado <= totalOrcado;
+            
+              return (
+                <div className={cn("rounded-lg p-4", isDentro ? "bg-green-50" : "bg-red-50")}>
+                  <p className={cn("text-sm mb-1", isDentro ? "text-green-600" : "text-red-600")}>
+                    Situação
+                  </p>
+                  <p className={cn("text-lg font-bold", isDentro ? "text-green-800" : "text-red-800")}>
+                    {isDentro ? 'Dentro do Orçamento' : 'Acima do Orçamento'}
+                  </p>
+                  <p className={cn("text-xs", isDentro ? "text-green-600" : "text-red-600")}>
+                    {formatNumber(percentual, 2)}% executado
+                  </p>
+                </div>
+              );
+            })()
         </div>
 
         <div className="overflow-x-auto mb-8">
