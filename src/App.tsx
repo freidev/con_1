@@ -2357,6 +2357,7 @@ return {
       ['Registros', String(exportPreview.records)],
       ['Litros', exportPreview.litros.toFixed(2)],
       ['Valor Total (R$)', exportPreview.valor.toFixed(2)],
+      ];
 
     const infoSheet = XLSX.utils.aoa_to_sheet(infoRows);
     XLSX.utils.book_append_sheet(workbook, infoSheet, 'INFORMAÇÕES');
