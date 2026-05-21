@@ -4992,10 +4992,10 @@ onAdd={async (r: any) => {
   );
 
   const renderPreenchimento = () => (
-    <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div className="w-full max-w-3xl mx-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-800 flex items-center gap-2">
             <Plus className="w-5 h-5 text-red-800" />
             Preenchimento de Abastecimento
           </h3>
@@ -5155,15 +5155,15 @@ onAdd={async (r: any) => {
 
     return (
       <div className="space-y-6">
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-          <p className="text-sm font-medium text-blue-800 mb-3 flex items-center gap-2">
+        <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+           <p className="text-xs sm:text-sm font-medium text-blue-800 mb-3 flex items-start gap-2 leading-5">
             <Droplets className="w-4 h-4" />
             DIGITE A PLACA OU SELECIONE O EQUIPAMENTO PARA PREENCHIMENTO AUTOMÁTICO
           </p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Placa</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <ComboInput
                   value={plate}
                   onChange={(value) => {
@@ -5181,7 +5181,7 @@ onAdd={async (r: any) => {
                 />
                 <button
                   onClick={handlePlateSearch}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
                 >
                   Buscar
                 </button>
@@ -5204,7 +5204,7 @@ onAdd={async (r: any) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">CC Novo *</label>
             <select
@@ -5288,7 +5288,7 @@ onAdd={async (r: any) => {
             />
           </div>
           {rateios.length > 0 && (
-            <div className="col-span-2">
+            <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Rateio (Opcional)</label>
               <select
                 value={selectedRateio}
@@ -5302,7 +5302,7 @@ onAdd={async (r: any) => {
               </select>
             </div>
           )}
-          <div className="col-span-2">
+          <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
             <input
               type="text"
