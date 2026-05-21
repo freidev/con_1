@@ -1013,12 +1013,6 @@ export default function App() {
   }
 };
 
-    // Em produção, esse código seria enviado por e-mail real.
-    // Aqui simulamos exibindo na notificação e no console.
-    console.log(`[Recuperação de senha] Código enviado para ${emailNormalizado}: ${code}`);
-    addNotification('success', `Código enviado para ${emailNormalizado}! Código: ${code} (válido por 10 min)`);
-  };
-
   const handleVerifyCode = () => {
     if (!enteredCode) {
       addNotification('error', 'Digite o código recebido');
