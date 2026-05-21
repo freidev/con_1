@@ -1,3 +1,4 @@
+import emailjs from '@emailjs/browser';
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { 
@@ -969,9 +970,7 @@ export default function App() {
     return;
   }
 
-  const user = users.find(
-    u => (u.email || '').toLowerCase() === emailNormalizado
-  );
+  const user = users.find(u => (u.email || '').toLowerCase() === emailNormalizado);
 
   if (!user) {
     addNotification('error', 'Não encontramos uma conta com este e-mail');
@@ -994,8 +993,6 @@ export default function App() {
   addNotification('info', 'Enviando código para o seu e-mail...');
 
   try {
-    const { default: emailjs } = await import('@emailjs/browser');
-
     await emailjs.send(
       'service_q5ttlda',
       'template_re205kc',
@@ -1008,17 +1005,11 @@ export default function App() {
       'pYgxhmfHC5Beyerda'
     );
 
-    addNotification(
-      'success',
-      `Código enviado para ${emailNormalizado}! Verifique sua caixa de entrada.`
-    );
+    addNotification('success', `Código enviado para ${emailNormalizado}! Verifique sua caixa de entrada.`);
 
   } catch (err) {
     console.error('Erro ao enviar e-mail:', err);
-    addNotification(
-      'warning',
-      `Não foi possível enviar o e-mail. Código temporário: ${code}`
-    );
+    addNotification('warning', `Não foi possível enviar o e-mail. Código temporário: ${code}`);
   }
 };
 
@@ -1050,7 +1041,7 @@ export default function App() {
     addNotification('success', 'Código verificado com sucesso! Defina sua nova senha.');
   };
 
-  const handleResendCode = async () => {
+ const handleResendCode = async () => {
   const user = users.find(u => u.id === forgotUserId);
   if (!user) return;
 
@@ -1064,8 +1055,6 @@ export default function App() {
   addNotification('info', 'Reenviando código...');
 
   try {
-    const { default: emailjs } = await import('@emailjs/browser');
-
     await emailjs.send(
       'service_q5ttlda',
       'template_re205kc',
@@ -1078,17 +1067,11 @@ export default function App() {
       'pYgxhmfHC5Beyerda'
     );
 
-    addNotification(
-      'success',
-      `Novo código enviado para ${user.email}!`
-    );
+    addNotification('success', `Novo código enviado para ${user.email}!`);
 
   } catch (err) {
     console.error('Erro ao reenviar e-mail:', err);
-    addNotification(
-      'warning',
-      `Erro ao enviar. Código temporário: ${code}`
-    );
+    addNotification('warning', `Erro ao enviar. Código temporário: ${code}`);
   }
 };
 
@@ -6487,3 +6470,4 @@ const handleRemoveAvatar = async () => {
       </div>
     </div>
   );
+} 
