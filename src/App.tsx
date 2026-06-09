@@ -771,6 +771,7 @@ export default function App() {
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
   const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
+  const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -6212,6 +6213,124 @@ const handleRemoveAvatar = async () => {
       </div>
     );
   };
+  const renderSolicitacoes = () => {
+    const [showForm, setShowForm] = useState(false);
+    const [pedidoBr, setPedidoBr] = useState('');
+    const [precoUnitario, setPrecoUnitario] = useState('');
+    const [quantidade, setQuantidade] = useState('');
+    const [atendimento, setAtendimento] = useState('');
+    const [dataHora, setDataHora] = useState(new Date().toISOString().slice(0,16));
+    const [tipoCombustivel, setTipoCombustivel] = useState('Diesel S10');
+    const [docFiscal, setDocFiscal] = useState('');
+    const [solicitante, setSolicitante] = useState(currentUser?.name || '');
+    const [status, setStatus] = useState('Pendente');
+    const [situacao, setSituacao] = useState('Solicitado');
+
+    const valorTotal = (parseFloat(precoUnitario) || 0) * (parseFloat(quantidade) || 0);
+    
+    // CÁLCULOS AUTOMÁTICOS
+    const totalSolicitado = solicitacoes.reduce((sum, s) => sum + (Number(s.quantidade) || 0), 0);
+    const totalRecebido = solicitacoes.filter(s => s.situacao === 'Recebido').reduce((sum, s) => sum + (Number(s.quantidade) || 0), 0);
+    const valorSolicitado = solicitacoes.reduce((sum, s) => sum + (Number(s.valorTotal) || 0), 0);
+    const valorRecebido = solicitacoes.filter(s => s.situacao === 'Recebido').reduce((sum, s) => sum + (Number(s.valorTotal) || 0), 0);
+
+    const handleAdd = () => {
+      if (!pedidoBr || !quantidade) { addNotification('error', 'Preencha Pedido BR e Quantidade'); return; }
+      const nova = {
+        id: Date.now(), pedidoBr, precoUnitario: parseFloat(precoUnitario)||0, valorTotal,
+        atendimento, dataHora, quantidade: parseFloat(quantidade)||0, tipoCombustivel, docFiscal,
+        solicitante, status, situacao, createdAt: new Date().toISOString()
+      };
+      setSolicitacoes(prev => [nova, ...prev]);
+      addNotification('success', 'Solicitação salva!');
+      setShowForm(false);
+      setPedidoBr(''); setPrecoUnitario(''); setQuantidade(''); setAtendimento(''); setDocFiscal('');
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* CARDS DE TOTAIS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <p className="text-sm text-slate-600">Total Solicitado</p>
+            <p className="text-2xl font-bold text-blue-700">{formatNumber(totalSolicitado,0)} L</p>
+            <p className="text-xs text-slate-400">{formatCurrency(valorSolicitado)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <p className="text-sm text-slate-600">Total Recebido</p>
+            <p className="text-2xl font-bold text-green-700">{formatNumber(totalRecebido,0)} L</p>
+            <p className="text-xs text-slate-400">{formatCurrency(valorRecebido)}</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <p className="text-sm text-slate-600">Pendente</p>
+            <p className="text-2xl font-bold text-amber-700">{formatNumber(totalSolicitado - totalRecebido,0)} L</p>
+            <p className="text-xs text-slate-400">{solicitacoes.filter(s=>s.status==='Pendente').length} pedidos</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <p className="text-sm text-slate-600">Total Pedidos</p>
+            <p className="text-2xl font-bold text-slate-800">{solicitacoes.length}</p>
+            <p className="text-xs text-slate-400">registros</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-red-800" /> Controle de Solicitações
+            </h3>
+            <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2">
+              <Plus className="w-4 h-4"/>{showForm ? 'Cancelar' : 'Nova Solicitação'}
+            </button>
+          </div>
+
+          {showForm && (
+            <div className="border border-blue-200 rounded-xl p-4 mb-6 bg-blue-50/50">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div><label className="text-xs font-medium">Pedido BR *</label><input value={pedidoBr} onChange={e=>setPedidoBr(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Preço Unitário *</label><input type="number" step="0.01" value={precoUnitario} onChange={e=>setPrecoUnitario(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Quantidade (L) *</label><input type="number" value={quantidade} onChange={e=>setQuantidade(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Valor Total</label><input value={formatCurrency(valorTotal)} disabled className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-slate-100 font-bold"/></div>
+                <div><label className="text-xs font-medium">Data/Hora Solicitação</label><input type="datetime-local" value={dataHora} onChange={e=>setDataHora(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Tipo Combustível</label><select value={tipoCombustivel} onChange={e=>setTipoCombustivel(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Diesel S10</option><option>Diesel S500</option><option>Gasolina</option><option>Etanol</option></select></div>
+                <div><label className="text-xs font-medium">Atendimento</label><input value={atendimento} onChange={e=>setAtendimento(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">DOC. Fiscal</label><input value={docFiscal} onChange={e=>setDocFiscal(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Solicitante</label><input value={solicitante} onChange={e=>setSolicitante(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Status</label><select value={status} onChange={e=>setStatus(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Pendente</option><option>Aprovado</option><option>Rejeitado</option><option>Em Trânsito</option></select></div>
+                <div><label className="text-xs font-medium">Situação do Pedido</label><select value={situacao} onChange={e=>setSituacao(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Solicitado</option><option>Recebido</option><option>Parcial</option><option>Cancelado</option></select></div>
+              </div>
+              <button onClick={handleAdd} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar Solicitação</button>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1200px]">
+              <thead><tr className="border-b text-xs uppercase text-slate-500">
+                <th className="text-left p-2">Pedido BR</th><th className="text-left p-2">Data/Hora</th><th className="text-left p-2">Tipo</th><th className="text-right p-2">Qtd (L)</th><th className="text-right p-2">Preço</th><th className="text-right p-2">Total</th><th className="text-left p-2">Solicitante</th><th className="text-left p-2">Status</th><th className="text-left p-2">Situação</th><th className="text-left p-2">DOC</th><th></th>
+              </tr></thead>
+              <tbody>
+                {solicitacoes.map(s=>(
+                  <tr key={s.id} className="border-b hover:bg-slate-50 text-sm">
+                    <td className="p-2 font-medium text-red-800">{s.pedidoBr}</td>
+                    <td className="p-2">{new Date(s.dataHora).toLocaleString('pt-BR')}</td>
+                    <td className="p-2">{s.tipoCombustivel}</td>
+                    <td className="p-2 text-right font-medium">{formatNumber(s.quantidade,0)}</td>
+                    <td className="p-2 text-right">{formatCurrency(s.precoUnitario)}</td>
+                    <td className="p-2 text-right font-bold">{formatCurrency(s.valorTotal)}</td>
+                    <td className="p-2">{s.solicitante}</td>
+                    <td className="p-2"><span className={cn("px-2 py-1 rounded text-xs", s.status==='Aprovado'?'bg-green-100 text-green-800':s.status==='Pendente'?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800')}>{s.status}</span></td>
+                    <td className="p-2"><span className={cn("px-2 py-1 rounded text-xs", s.situacao==='Recebido'?'bg-blue-100 text-blue-800':'bg-slate-100')}>{s.situacao}</span></td>
+                    <td className="p-2">{s.docFiscal}</td>
+                    <td className="p-2"><button onClick={()=>setSolicitacoes(prev=>prev.filter(x=>x.id!==s.id))} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4"/></button></td>
+                  </tr>
+                ))}
+                {solicitacoes.length===0 && <tr><td colSpan={11} className="p-8 text-center text-slate-400">Nenhuma solicitação cadastrada</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Main render
   if (!currentUser) {
@@ -6253,6 +6372,7 @@ const handleRemoveAvatar = async () => {
     { id: 'preenchimento', label: 'Preenchimento', icon: FileInput },
     { id: 'import', label: 'Importação', icon: Upload },
     { id: 'export', label: 'Exportação', icon: Download },
+    { id: 'solicitacoes', label: 'Controle de Solicitações', icon: Briefcase },
   ];
 
   const adminNavItems = [
@@ -6418,6 +6538,7 @@ const handleRemoveAvatar = async () => {
                    currentPage === 'preenchimento' ? 'Preenchimento' :
                    currentPage === 'import' ? 'Importação' :
                    currentPage === 'export' ? 'Exportação' :
+                   currentPage === 'solicitacoes' ? 'Controle de Solicitações' :
                    currentPage === 'users' ? 'Usuários' : 'Sistema'}
                 </h2>
               </div>
@@ -6443,6 +6564,7 @@ const handleRemoveAvatar = async () => {
           {currentPage === 'preenchimento' && renderPreenchimento()}
           {currentPage === 'import' && renderImport()}
           {currentPage === 'export' && renderExport()}
+          {currentPage === 'solicitacoes' && renderSolicitacoes()}
           {currentPage === 'diesel' && renderDieselPrice()}
           {currentPage === 'users' && renderUsers()}
           {currentPage === 'profile' && renderProfile()}
