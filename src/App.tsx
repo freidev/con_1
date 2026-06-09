@@ -6214,17 +6214,17 @@ const handleRemoveAvatar = async () => {
     );
   };
   const renderSolicitacoes = () => {
-    const [showForm, setShowForm] = useState(false);
-    const [pedidoBr, setPedidoBr] = useState('');
-    const [precoUnitario, setPrecoUnitario] = useState('');
-    const [quantidade, setQuantidade] = useState('');
-    const [atendimento, setAtendimento] = useState('');
-    const [dataHora, setDataHora] = useState(new Date().toISOString().slice(0,16));
-    const [tipoCombustivel, setTipoCombustivel] = useState('Diesel S10');
-    const [docFiscal, setDocFiscal] = useState('');
-    const [solicitante, setSolicitante] = useState(currentUser?.name || '');
-    const [status, setStatus] = useState('Pendente');
-    const [situacao, setSituacao] = useState('Solicitado');
+  const [showSolForm, setShowSolForm] = useState(false);
+  const [pedidoBr, setPedidoBr] = useState('');
+  const [precoUnitario, setPrecoUnitario] = useState('');
+  const [quantidade, setQuantidade] = useState('');
+  const [atendimento, setAtendimento] = useState('');
+  const [dataHora, setDataHora] = useState(new Date().toISOString().slice(0,16));
+  const [tipoCombustivel, setTipoCombustivel] = useState('Diesel S10');
+  const [docFiscal, setDocFiscal] = useState('');
+  const [solicitante, setSolicitante] = useState('');
+  const [statusSol, setStatusSol] = useState('Pendente');
+  const [situacao, setSituacao] = useState('Solicitado');
 
     const valorTotal = (parseFloat(precoUnitario) || 0) * (parseFloat(quantidade) || 0);
     
@@ -6239,11 +6239,11 @@ const handleRemoveAvatar = async () => {
       const nova = {
         id: Date.now(), pedidoBr, precoUnitario: parseFloat(precoUnitario)||0, valorTotal,
         atendimento, dataHora, quantidade: parseFloat(quantidade)||0, tipoCombustivel, docFiscal,
-        solicitante, status, situacao, createdAt: new Date().toISOString()
+        solicitante, status: statusSol, situacao, createdAt: new Date().toISOString()
       };
       setSolicitacoes(prev => [nova, ...prev]);
       addNotification('success', 'Solicitação salva!');
-      setShowForm(false);
+      setShowSolForm(false);
       setPedidoBr(''); setPrecoUnitario(''); setQuantidade(''); setAtendimento(''); setDocFiscal('');
     };
 
@@ -6278,12 +6278,12 @@ const handleRemoveAvatar = async () => {
             <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
               <Briefcase className="w-5 h-5 text-red-800" /> Controle de Solicitações
             </h3>
-            <button onClick={()=>setShowForm(!showForm)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2">
-              <Plus className="w-4 h-4"/>{showForm ? 'Cancelar' : 'Nova Solicitação'}
+            <button onClick={()=>setShowSolForm(!showSolForm)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2">
+              <Plus className="w-4 h-4"/>{showSolForm ? 'Cancelar' : 'Nova Solicitação'}
             </button>
           </div>
 
-          {showForm && (
+          {showSolForm && (
             <div className="border border-blue-200 rounded-xl p-4 mb-6 bg-blue-50/50">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div><label className="text-xs font-medium">Pedido BR *</label><input value={pedidoBr} onChange={e=>setPedidoBr(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
@@ -6295,7 +6295,7 @@ const handleRemoveAvatar = async () => {
                 <div><label className="text-xs font-medium">Atendimento</label><input value={atendimento} onChange={e=>setAtendimento(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">DOC. Fiscal</label><input value={docFiscal} onChange={e=>setDocFiscal(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Solicitante</label><input value={solicitante} onChange={e=>setSolicitante(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Status</label><select value={status} onChange={e=>setStatus(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Pendente</option><option>Aprovado</option><option>Rejeitado</option><option>Em Trânsito</option></select></div>
+                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Pendente</option><option>Aprovado</option><option>Rejeitado</option><option>Em Trânsito</option></select></div>
                 <div><label className="text-xs font-medium">Situação do Pedido</label><select value={situacao} onChange={e=>setSituacao(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Solicitado</option><option>Recebido</option><option>Parcial</option><option>Cancelado</option></select></div>
               </div>
               <button onClick={handleAdd} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar Solicitação</button>
