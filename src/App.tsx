@@ -4097,30 +4097,15 @@ return {
                 {rateios.length} ativo{rateios.length !== 1 ? 's' : ''}
               </span>
               <button
-                // ✅ CORRIGIDO - Apaga do banco e do estado
-                onClick={async () => {
-                  if (!window.confirm('Tem certeza que deseja excluir este rateio?')) return;
-                
-                  const { error } = await supabase
-                    .from('rateios')
-                    .delete()
-                    .eq('id', r.id);
-                
-                  if (error) {
-                    console.error('ERRO ao excluir rateio:', error);
-                    addNotification('error', `Erro ao excluir rateio: ${error.message}`);
-                    return;
-                  }
-                
-                  setRateios(prev => prev.filter(x => x.id !== r.id));
-                  addNotification('success', 'Rateio removido com sucesso!');
-                }}
-                
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-blue-700 sm:w-auto"
-              >
-                <Plus className="h-4 w-4" />
-                Novo Rateio
-              </button>
+                  onClick={() => {
+                    setEditingRateio(null);     // Limpa qualquer edição anterior
+                    setShowRateioForm(true);    // Abre o formulário
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow transition hover:bg-blue-700 sm:w-auto"
+                >
+                  <Plus className="h-4 w-4" />
+                  Novo Rateio
+                </button>
             </div>
           </div>
         </div>
@@ -4229,6 +4214,7 @@ onAdd={async (r: any) => {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                    
                       <button
                         onClick={() => {
                           setEditingRateio(r);
@@ -4240,8 +4226,24 @@ onAdd={async (r: any) => {
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
+                    
+                      {/* Botão de Excluir - Corrigido */}
                       <button
-                        onClick={() => {
+                        onClick={async (e) => {
+                          e.stopPropagation(); // Evita que o clique propague para outros elementos
+                          if (!window.confirm('Tem certeza que deseja excluir este rateio?')) return;
+                    
+                          const { error } = await supabase
+                            .from('rateios')
+                            .delete()
+                            .eq('id', r.id);
+                    
+                          if (error) {
+                            console.error('ERRO ao excluir rateio:', error);
+                            addNotification('error', `Erro ao excluir rateio: ${error.message}`);
+                            return;
+                          }
+                    
                           setRateios(prev => prev.filter(x => x.id !== r.id));
                           addNotification('success', 'Rateio removido com sucesso!');
                         }}
@@ -4250,6 +4252,7 @@ onAdd={async (r: any) => {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                    
                       <button
                         onClick={() => setExpandedRateioId(isExpanded ? null : r.id)}
                         className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 transition"
@@ -4618,10 +4621,10 @@ onAdd={async (r: any) => {
             </button>
             <button
                     type="button"
-                    onClick={() => {
-                      setShowRateioForm(false);
-                      setEditingRateio(null);
-                    }}
+                      onClick={() => {
+                        setEditingRateio(null);
+                        setShowRateioForm(true);
+                      }}
                     className="px-6 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg flex items-center gap-2"
                   >
                     <X className="w-4 h-4" />
