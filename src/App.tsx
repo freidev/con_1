@@ -6294,7 +6294,7 @@ const handleRemoveAvatar = async () => {
                 {navItems
                   .filter(item => {
                     if (currentUser?.role === 'admin') return true;
-                    if (currentUser?.role === 'supervisor') return ['dashboard', 'budget', 'history','preenchimento','import', 'export', 'diesel'].includes(item.id);
+                    if (currentUser?.role === 'supervisor') return ['dashboard', 'budget','equipments', 'history','preenchimento','import', 'export', 'diesel'].includes(item.id);
                     return item.id === 'preenchimento';
                   })
                   .map(item => {
