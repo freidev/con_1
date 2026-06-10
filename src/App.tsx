@@ -781,8 +781,8 @@ export default function App() {
   const [tipo, setTipo] = useState('Diesel S10');
   const [doc, setDoc] = useState('');
   const [solic, setSolic] = useState(currentUser?.name || '');
-  const [statusSol, setStatusSol] = useState('Pendente');
-  const [sit, setSit] = useState('Solicitado');
+  const [statusSol, setStatusSol] = useState('SOLICITADO');
+  const [sit, setSit] = useState('LIBERADO PARCIALMENTE');
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -1152,7 +1152,7 @@ const handleResetPassword = async () => {
     
       addNotification(
         'success',
-        `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
+        `Usuário ${status === 'approved' ? 'RECEBIDO' : 'rejeitado'} com sucesso!`
       );
     };
 
@@ -5954,7 +5954,7 @@ const handleRemoveAvatar = async () => {
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
-              <p className="text-slate-600 font-medium">Todos os usuários estão aprovados</p>
+              <p className="text-slate-600 font-medium">Todos os usuários estão RECEBIDOs</p>
               <p className="text-sm text-slate-400">Não há pendências de aprovação</p>
             </div>
           ) : (
@@ -6028,8 +6028,8 @@ const handleRemoveAvatar = async () => {
                         user.status === 'pending' ? "bg-amber-100 text-amber-800" :
                         "bg-red-100 text-red-800"
                       )}>
-                        {user.status === 'approved' ? 'Aprovado' :
-                         user.status === 'pending' ? 'Pendente' : 'Rejeitado'}
+                        {user.status === 'approved' ? 'RECEBIDO' :
+                         user.status === 'pending' ? 'SOLICITADO' : 'Rejeitado'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-500">
@@ -6228,9 +6228,9 @@ const handleRemoveAvatar = async () => {
   const renderSolicitacoes = () => {
     const vT = ((parseFloat(prU) || 0) * (parseFloat(qt) || 0));
     const tSol = solList.reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const tRec = solList.filter(x => x.sit === 'Recebido').reduce((a,c) => a + (Number(c.qt)||0), 0);
+    const tRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.qt)||0), 0);
     const vSol = solList.reduce((a,c) => a + (Number(c.vT)||0), 0);
-    const vRec = solList.filter(x => x.sit === 'Recebido').reduce((a,c) => a + (Number(c.vT)||0), 0);
+    const vRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.vT)||0), 0);
 
     const addSol = () => {
       if(!pBr || !qt){ addNotification('error','Preencha Pedido BR e Quantidade'); return;}
@@ -6243,19 +6243,19 @@ const handleRemoveAvatar = async () => {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Solicitado</p>
+            <p className="text-sm text-slate-600">Total LIBERADO PARCIALMENTE</p>
             <p className="text-2xl font-bold text-blue-700">{formatNumber(tSol,0)} L</p>
             <p className="text-xs text-slate-400">{formatCurrency(vSol)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Recebido</p>
+            <p className="text-sm text-slate-600">Total LIBERADO</p>
             <p className="text-2xl font-bold text-green-700">{formatNumber(tRec,0)} L</p>
             <p className="text-xs text-slate-400">{formatCurrency(vRec)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Pendente</p>
+            <p className="text-sm text-slate-600">SOLICITADO</p>
             <p className="text-2xl font-bold text-amber-700">{formatNumber(tSol-tRec,0)} L</p>
-            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='Pendente').length} pedidos</p>
+            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='SOLICITADO').length} pedidos</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <p className="text-sm text-slate-600">Total Pedidos</p>
@@ -6285,8 +6285,8 @@ const handleRemoveAvatar = async () => {
                 <div><label className="text-xs font-medium">Atendimento</label><input value={atend} onChange={e=>setAtend(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">DOC Fiscal</label><input value={doc} onChange={e=>setDoc(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Solicitante</label><input value={solic} onChange={e=>setSolic(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Pendente</option><option>Aprovado</option><option>Em Trânsito</option></select></div>
-                <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Solicitado</option><option>Recebido</option><option>Cancelado</option></select></div>
+                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>SOLICITADO</option><option>RECEBIDO</option><option>ATRASADO</option></select></div>
+                <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>LIBERADO PARCIALMENTE</option><option>LIBERADO</option><option>BLOQUEADO</option></select></div>
               </div>
               <button onClick={addSol} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar</button>
             </div>
@@ -6307,8 +6307,8 @@ const handleRemoveAvatar = async () => {
                     <td className="p-3 text-right">{formatCurrency(s.prU)}</td>
                     <td className="p-3 text-right font-bold">{formatCurrency(s.vT)}</td>
                     <td className="p-3">{s.solic}</td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.st==='Aprovado'?'bg-green-100 text-green-800':s.st==='Pendente'?'bg-amber-100 text-amber-800':'bg-red-100')}>{s.st}</span></td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.sit==='Recebido'?'bg-blue-100 text-blue-800':'bg-slate-100')}>{s.sit}</span></td>
+                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.st==='RECEBIDO'?'bg-green-100 text-green-800':s.st==='SOLICITADO'?'bg-amber-100 text-amber-800':'bg-red-100')}>{s.st}</span></td>
+                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.sit==='LIBERADO'?'bg-blue-100 text-blue-800':'bg-slate-100')}>{s.sit}</span></td>
                     <td className="p-3">{s.doc||'-'}</td>
                     <td className="p-3"><button onClick={()=>setSolList(prev=>prev.filter(x=>x.id!==s.id))} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="w-4 h-4"/></button></td>
                   </tr>
