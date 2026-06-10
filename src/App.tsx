@@ -842,7 +842,7 @@ export default function App() {
   const [showBudgetPeriodMenu, setShowBudgetPeriodMenu] = useState(false);
 
   // Base de Dados tab
-  abaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
+  const [databaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [databaseFilters, setDatabaseFilters] = useState<DatabaseFilterState>(createDefaultDatabaseFilters());
   const [editingRecord, setEditingRecord] = useState<Abastecimento | null>(null);
@@ -6281,12 +6281,12 @@ const handleRemoveAvatar = async () => {
                 <div><label className="text-xs font-medium">Quantidade (L) *</label><input type="number" value={qt} onChange={e=>setQt(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Valor Total</label><input value={formatCurrency(vT)} disabled className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-slate-100 font-bold"/></div>
                 <div><label className="text-xs font-medium">Data/Hora Solicitação</label><input type="datetime-local" value={dh} onChange={e=>setDh(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">📅 Data Programada</label><input type="date" value={dataProg} onChange={e=>setDataProg(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Combustível</label><select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Diesel S10</option><option>Diesel S500</option><option>Gasolina</option></select></div>
+                <div><label className="text-xs font-medium">Data Programada</label><input type="date" value={dataProg} onChange={e=>setDataProg(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Combustível</label><select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Diesel B10</option><option>Diesel S500</option><option>Gasolina</option></select></div>
                 <div><label className="text-xs font-medium">Atendimento</label><input value={atend} onChange={e=>setAtend(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">DOC Fiscal</label><input value={doc} onChange={e=>setDoc(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Solicitante</label><input value={slic} onChange={e=>setSlic(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>SOLICITADO</option><option>RECEBIDO</option><option>EM TRÂNSITO</option></select></div>
+                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>SOLICITADO</option><option>RECEBIDO</option><option>ATRASADO</option></select></div>
                 <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>LIBERADO PARCIALMENTE</option><option>LIBERADO</option><option>BLOQUEADO</option></select></div>
               </div>
               <button onClick={addSol} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar</button>
