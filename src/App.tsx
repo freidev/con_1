@@ -778,11 +778,12 @@ export default function App() {
   const [qt, setQt] = useState('');
   const [atend, setAtend] = useState('');
   const [dh, setDh] = useState(new Date().toISOString().slice(0,16));
+  const [dataProg, setDataProg] = useState('');
   const [tipo, setTipo] = useState('Diesel S10');
   const [doc, setDoc] = useState('');
   const [solic, setSolic] = useState(currentUser?.name || '');
-  const [statusSol, setStatusSol] = useState('Pendente');
-  const [sit, setSit] = useState('Solicitado');
+  const [statusSol, setStatusSol] = useState('SOLICITADO');
+  const [sit, setSit] = useState('LIBERADO PARCIALMENTE');
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -842,7 +843,7 @@ export default function App() {
   const [showBudgetPeriodMenu, setShowBudgetPeriodMenu] = useState(false);
 
   // Base de Dados tab
-  const [databaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
+  abaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [databaseFilters, setDatabaseFilters] = useState<DatabaseFilterState>(createDefaultDatabaseFilters());
   const [editingRecord, setEditingRecord] = useState<Abastecimento | null>(null);
@@ -6228,15 +6229,15 @@ const handleRemoveAvatar = async () => {
   const renderSolicitacoes = () => {
     const vT = ((parseFloat(prU) || 0) * (parseFloat(qt) || 0));
     const tSol = solList.reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const tRec = solList.filter(x => x.sit === 'Recebido').reduce((a,c) => a + (Number(c.qt)||0), 0);
+    const tRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.qt)||0), 0);
     const vSol = solList.reduce((a,c) => a + (Number(c.vT)||0), 0);
-    const vRec = solList.filter(x => x.sit === 'Recebido').reduce((a,c) => a + (Number(c.vT)||0), 0);
+    const vRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.vT)||0), 0);
 
     const addSol = () => {
       if(!pBr || !qt){ addNotification('error','Preencha Pedido BR e Quantidade'); return;}
-      setSolList(prev => [{id:Date.now(), pBr, prU:parseFloat(prU)||0, vT, atend, dh, qt:parseFloat(qt)||0, tipo, doc, solic, st: statusSol, sit}, ...prev]);
+      setSolList(prev => [{id:Date.now(), pBr, prU:parseFloat(prU)||0, vT, atend, dh, dataProg, qt:parseFloat(qt)||0, tipo, doc, solic, st: statusSol, sit}, ...prev]);
       addNotification('success','Salvo!');
-      setShowF(false);setPBr('');setPrU('');setQt('');setAtend('');setDoc('');
+      setShowF(false);setPBr('');setPrU('');setQt('');setAtend('');setDoc('');setDataProg('');
     };
 
     return (
@@ -6248,14 +6249,14 @@ const handleRemoveAvatar = async () => {
             <p className="text-xs text-slate-400">{formatCurrency(vSol)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Recebido</p>
+            <p className="text-sm text-slate-600">Total Recebido (Liberado)</p>
             <p className="text-2xl font-bold text-green-700">{formatNumber(tRec,0)} L</p>
             <p className="text-xs text-slate-400">{formatCurrency(vRec)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Pendente</p>
+            <p className="text-sm text-slate-600">Pendente/Parcial</p>
             <p className="text-2xl font-bold text-amber-700">{formatNumber(tSol-tRec,0)} L</p>
-            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='Pendente').length} pedidos</p>
+            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='SOLICITADO' || s.sit==='LIBERADO PARCIALMENTE').length} pedidos</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <p className="text-sm text-slate-600">Total Pedidos</p>
@@ -6280,40 +6281,42 @@ const handleRemoveAvatar = async () => {
                 <div><label className="text-xs font-medium">Preço Unitário *</label><input type="number" step="0.01" value={prU} onChange={e=>setPrU(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Quantidade (L) *</label><input type="number" value={qt} onChange={e=>setQt(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Valor Total</label><input value={formatCurrency(vT)} disabled className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-slate-100 font-bold"/></div>
-                <div><label className="text-xs font-medium">Data/Hora</label><input type="datetime-local" value={dh} onChange={e=>setDh(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Data/Hora Solicitação</label><input type="datetime-local" value={dh} onChange={e=>setDh(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">📅 Data Programada</label><input type="date" value={dataProg} onChange={e=>setDataProg(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">Combustível</label><select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Diesel S10</option><option>Diesel S500</option><option>Gasolina</option></select></div>
                 <div><label className="text-xs font-medium">Atendimento</label><input value={atend} onChange={e=>setAtend(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
                 <div><label className="text-xs font-medium">DOC Fiscal</label><input value={doc} onChange={e=>setDoc(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Solicitante</label><input value={solic} onChange={e=>setSolic(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Pendente</option><option>Aprovado</option><option>Em Trânsito</option></select></div>
-                <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Solicitado</option><option>Recebido</option><option>Cancelado</option></select></div>
+                <div><label className="text-xs font-medium">Solicitante</label><input value={slic} onChange={e=>setSlic(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
+                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>SOLICITADO</option><option>RECEBIDO</option><option>EM TRÂNSITO</option></select></div>
+                <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>LIBERADO PARCIALMENTE</option><option>LIBERADO</option><option>BLOQUEADO</option></select></div>
               </div>
               <button onClick={addSol} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar</button>
             </div>
           )}
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1200px] text-sm">
               <thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500">
-                <th className="text-left p-3">Pedido BR</th><th className="text-left p-3">Data/Hora</th><th className="text-left p-3">Tipo</th><th className="text-right p-3">Qtd(L)</th><th className="text-right p-3">R$/L</th><th className="text-right p-3">Total</th><th className="text-left p-3">Solic.</th><th className="text-left p-3">Status</th><th className="text-left p-3">Situação</th><th className="text-left p-3">DOC</th><th></th>
+                <th className="text-left p-3">Pedido BR</th><th className="text-left p-3">Data/Hora</th><th className="text-left p-3">📅 Data Prog.</th><th className="text-left p-3">Tipo</th><th className="text-right p-3">Qtd(L)</th><th className="text-right p-3">R$/L</th><th className="text-right p-3">Total</th><th className="text-left p-3">Solic.</th><th className="text-left p-3">Status</th><th className="text-left p-3">Situação</th><th className="text-left p-3">DOC</th><th></th>
               </tr></thead>
               <tbody>
                 {solList.map(s=>(
                   <tr key={s.id} className="border-b hover:bg-slate-50">
                     <td className="p-3 font-medium text-red-800">{s.pBr}</td>
                     <td className="p-3">{new Date(s.dh).toLocaleString('pt-BR')}</td>
+                    <td className="p-3">{s.dataProg ? new Date(s.dataProg).toLocaleDateString('pt-BR') : '-'}</td>
                     <td className="p-3">{s.tipo}</td>
                     <td className="p-3 text-right font-medium">{formatNumber(s.qt,0)}</td>
                     <td className="p-3 text-right">{formatCurrency(s.prU)}</td>
                     <td className="p-3 text-right font-bold">{formatCurrency(s.vT)}</td>
                     <td className="p-3">{s.solic}</td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.st==='Aprovado'?'bg-green-100 text-green-800':s.st==='Pendente'?'bg-amber-100 text-amber-800':'bg-red-100')}>{s.st}</span></td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.sit==='Recebido'?'bg-blue-100 text-blue-800':'bg-slate-100')}>{s.sit}</span></td>
+                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.st==='RECEBIDO'?'bg-green-100 text-green-800':s.st==='SOLICITADO'?'bg-blue-100 text-blue-800':'bg-amber-100 text-amber-800')}>{s.st}</span></td>
+                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.sit==='LIBERADO'?'bg-green-100 text-green-800':s.sit==='LIBERADO PARCIALMENTE'?'bg-amber-100 text-amber-800':'bg-red-100 text-red-800')}>{s.sit}</span></td>
                     <td className="p-3">{s.doc||'-'}</td>
                     <td className="p-3"><button onClick={()=>setSolList(prev=>prev.filter(x=>x.id!==s.id))} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="w-4 h-4"/></button></td>
                   </tr>
                 ))}
-                {solList.length===0 && <tr><td colSpan={11} className="p-8 text-center text-slate-400">Nenhum registro</td></tr>}
+                {solList.length===0 && <tr><td colSpan={12} className="p-8 text-center text-slate-400">Nenhum registro</td></tr>}
               </tbody>
             </table>
           </div>
@@ -6322,36 +6325,7 @@ const handleRemoveAvatar = async () => {
     );
   };
 
-  // Main render
-  if (!currentUser) {
-    return (
-      <>
-        {renderLogin()}
-        {/* Notifications */}
-        <div className="fixed top-4 right-4 space-y-2 z-50">
-          {notifications.map(n => (
-            <div
-              key={n.id}
-              className={cn(
-                "px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-pulse",
-                n.type === 'success' ? "bg-green-600 text-white" :
-                n.type === 'error' ? "bg-red-600 text-white" :
-                n.type === 'warning' ? "bg-amber-600 text-white" :
-                "bg-blue-600 text-white"
-              )}
-            >
-              {n.type === 'success' && <CheckCircle className="w-5 h-5" />}
-              {n.type === 'error' && <AlertCircle className="w-5 h-5" />}
-              {n.type === 'warning' && <AlertCircle className="w-5 h-5" />}
-              {n.type === 'info' && <Bell className="w-5 h-5" />}
-              {n.message}
-            </div>
-          ))}
-        </div>
-      </>
-    );
-  }
-
+  
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'database', label: 'Base de Dados', icon: Database },
