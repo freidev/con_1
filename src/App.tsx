@@ -842,7 +842,7 @@ export default function App() {
   const [showBudgetPeriodMenu, setShowBudgetPeriodMenu] = useState(false);
 
   // Base de Dados tab
-  abaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
+  const [databaseTab, setDatabaseTab] = useState<'abastecimentos' | 'equipamentos'>('abastecimentos');
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [databaseFilters, setDatabaseFilters] = useState<DatabaseFilterState>(createDefaultDatabaseFilters());
   const [editingRecord, setEditingRecord] = useState<Abastecimento | null>(null);
