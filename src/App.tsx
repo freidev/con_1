@@ -6243,17 +6243,17 @@ const handleRemoveAvatar = async () => {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total LIBERADO PARCIALMENTE</p>
+            <p className="text-sm text-slate-600">Total Liberado Parcialmente</p>
             <p className="text-2xl font-bold text-blue-700">{formatNumber(tSol,0)} L</p>
             <p className="text-xs text-slate-400">{formatCurrency(vSol)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total LIBERADO</p>
+            <p className="text-sm text-slate-600">Total Liberado</p>
             <p className="text-2xl font-bold text-green-700">{formatNumber(tRec,0)} L</p>
             <p className="text-xs text-slate-400">{formatCurrency(vRec)}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">SOLICITADO</p>
+            <p className="text-sm text-slate-600">Solicitado</p>
             <p className="text-2xl font-bold text-amber-700">{formatNumber(tSol-tRec,0)} L</p>
             <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='SOLICITADO').length} pedidos</p>
           </div>
