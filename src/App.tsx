@@ -771,7 +771,6 @@ export default function App() {
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
   const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
-  const [solList, setSolList] = useState([]);
   const [showF, setShowF] = useState(false);
   const [pBr, setPBr] = useState('');
   const [prU, setPrU] = useState('');
@@ -6228,10 +6227,10 @@ const handleRemoveAvatar = async () => {
   };
   const renderSolicitacoes = () => {
     const vT = ((parseFloat(prU) || 0) * (parseFloat(qt) || 0));
-    const tSol = solList.reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const tRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const vSol = solList.reduce((a,c) => a + (Number(c.vT)||0), 0);
-    const vRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.vT)||0), 0);
+    const tSol = solicitacoes.reduce((a,c) => a + (Number(c.qt)||0), 0);
+    const tRec = solicitacoes.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.qt)||0), 0);
+    const vSol = solicitacoes.reduce((a,c) => a + (Number(c.vT)||0), 0);
+    const vRec = solicitacoes.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.vT)||0), 0);
 
     const addSol = () => {
       if(!pBr || !qt){ addNotification('error','Preencha Pedido BR e Quantidade'); return;}
@@ -6256,11 +6255,11 @@ const handleRemoveAvatar = async () => {
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <p className="text-sm text-slate-600">Pendente/Parcial</p>
             <p className="text-2xl font-bold text-amber-700">{formatNumber(tSol-tRec,0)} L</p>
-            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='SOLICITADO' || s.sit==='LIBERADO PARCIALMENTE').length} pedidos</p>
+            <p className="text-xs text-slate-400">{solicitacoes.filter(s=>s.st==='SOLICITADO' || s.sit==='LIBERADO PARCIALMENTE').length} pedidos</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <p className="text-sm text-slate-600">Total Pedidos</p>
-            <p className="text-2xl font-bold text-slate-800">{solList.length}</p>
+            <p className="text-2xl font-bold text-slate-800">{solicitacoes.length}</p>
           </div>
         </div>
 
@@ -6300,7 +6299,7 @@ const handleRemoveAvatar = async () => {
                 <th className="text-left p-3">Pedido BR</th><th className="text-left p-3">Data/Hora</th><th className="text-left p-3">📅 Data Prog.</th><th className="text-left p-3">Tipo</th><th className="text-right p-3">Qtd(L)</th><th className="text-right p-3">R$/L</th><th className="text-right p-3">Total</th><th className="text-left p-3">Solic.</th><th className="text-left p-3">Status</th><th className="text-left p-3">Situação</th><th className="text-left p-3">DOC</th><th></th>
               </tr></thead>
               <tbody>
-                {solList.map(s=>(
+                {solicitacoes.map(s=>(
                   <tr key={s.id} className="border-b hover:bg-slate-50">
                     <td className="p-3 font-medium text-red-800">{s.pBr}</td>
                     <td className="p-3">{new Date(s.dh).toLocaleString('pt-BR')}</td>
@@ -6316,7 +6315,7 @@ const handleRemoveAvatar = async () => {
                     <td className="p-3"><button onClick={()=>setSolList(prev=>prev.filter(x=>x.id!==s.id))} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="w-4 h-4"/></button></td>
                   </tr>
                 ))}
-                {solList.length===0 && <tr><td colSpan={12} className="p-8 text-center text-slate-400">Nenhum registro</td></tr>}
+                {solicitacoes.length===0 && <tr><td colSpan={12} className="p-8 text-center text-slate-400">Nenhum registro</td></tr>}
               </tbody>
             </table>
           </div>
