@@ -771,19 +771,6 @@ export default function App() {
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
   const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
   const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
-  const [solList, setSolList] = useState([]);
-  const [showF, setShowF] = useState(false);
-  const [pBr, setPBr] = useState('');
-  const [prU, setPrU] = useState('');
-  const [qt, setQt] = useState('');
-  const [atend, setAtend] = useState('');
-  const [dh, setDh] = useState(new Date().toISOString().slice(0,16));
-  const [tipo, setTipo] = useState('Diesel S10');
-  const [doc, setDoc] = useState('');
-  const [solic, setSolic] = useState(currentUser?.name || '');
-  const [statusSol, setStatusSol] = useState('SOLICITADO');
-  const [sit, setSit] = useState('LIBERADO PARCIALMENTE');
-  const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -1152,7 +1139,7 @@ const handleResetPassword = async () => {
     
       addNotification(
         'success',
-        `Usuário ${status === 'approved' ? 'RECEBIDO' : 'rejeitado'} com sucesso!`
+        `Usuário ${status === 'approved' ? 'aprovado' : 'rejeitado'} com sucesso!`
       );
     };
 
@@ -5954,7 +5941,7 @@ const handleRemoveAvatar = async () => {
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
-              <p className="text-slate-600 font-medium">Todos os usuários estão RECEBIDOs</p>
+              <p className="text-slate-600 font-medium">Todos os usuários estão aprovados</p>
               <p className="text-sm text-slate-400">Não há pendências de aprovação</p>
             </div>
           ) : (
@@ -6028,8 +6015,8 @@ const handleRemoveAvatar = async () => {
                         user.status === 'pending' ? "bg-amber-100 text-amber-800" :
                         "bg-red-100 text-red-800"
                       )}>
-                        {user.status === 'approved' ? 'RECEBIDO' :
-                         user.status === 'pending' ? 'SOLICITADO' : 'Rejeitado'}
+                        {user.status === 'approved' ? 'Aprovado' :
+                         user.status === 'pending' ? 'Pendente' : 'Rejeitado'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-500">
@@ -6225,102 +6212,6 @@ const handleRemoveAvatar = async () => {
       </div>
     );
   };
-  const renderSolicitacoes = () => {
-    const vT = ((parseFloat(prU) || 0) * (parseFloat(qt) || 0));
-    const tSol = solList.reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const tRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.qt)||0), 0);
-    const vSol = solList.reduce((a,c) => a + (Number(c.vT)||0), 0);
-    const vRec = solList.filter(x => x.sit === 'LIBERADO').reduce((a,c) => a + (Number(c.vT)||0), 0);
-
-    const addSol = () => {
-      if(!pBr || !qt){ addNotification('error','Preencha Pedido BR e Quantidade'); return;}
-      setSolList(prev => [{id:Date.now(), pBr, prU:parseFloat(prU)||0, vT, atend, dh, qt:parseFloat(qt)||0, tipo, doc, solic, st: statusSol, sit}, ...prev]);
-      addNotification('success','Salvo!');
-      setShowF(false);setPBr('');setPrU('');setQt('');setAtend('');setDoc('');
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Liberado Parcialmente</p>
-            <p className="text-2xl font-bold text-blue-700">{formatNumber(tSol,0)} L</p>
-            <p className="text-xs text-slate-400">{formatCurrency(vSol)}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Liberado</p>
-            <p className="text-2xl font-bold text-green-700">{formatNumber(tRec,0)} L</p>
-            <p className="text-xs text-slate-400">{formatCurrency(vRec)}</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Solicitado</p>
-            <p className="text-2xl font-bold text-amber-700">{formatNumber(tSol-tRec,0)} L</p>
-            <p className="text-xs text-slate-400">{solList.filter(s=>s.st==='SOLICITADO').length} pedidos</p>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <p className="text-sm text-slate-600">Total Pedidos</p>
-            <p className="text-2xl font-bold text-slate-800">{solList.length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-red-800"/> Controle de Solicitações
-            </h3>
-            <button onClick={()=>setShowF(!showF)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2">
-              <Plus className="w-4 h-4"/>{showF ? 'Cancelar' : 'Nova'}
-            </button>
-          </div>
-
-          {showF && (
-            <div className="border border-blue-200 rounded-xl p-4 mb-6 bg-blue-50/50">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                <div><label className="text-xs font-medium">Pedido BR *</label><input value={pBr} onChange={e=>setPBr(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Preço Unitário *</label><input type="number" step="0.01" value={prU} onChange={e=>setPrU(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Quantidade (L) *</label><input type="number" value={qt} onChange={e=>setQt(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Valor Total</label><input value={formatCurrency(vT)} disabled className="w-full mt-1 px-3 py-2 border rounded-lg text-sm bg-slate-100 font-bold"/></div>
-                <div><label className="text-xs font-medium">Data/Hora</label><input type="datetime-local" value={dh} onChange={e=>setDh(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Combustível</label><select value={tipo} onChange={e=>setTipo(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>Diesel S10</option><option>Diesel S500</option><option>Gasolina</option></select></div>
-                <div><label className="text-xs font-medium">Atendimento</label><input value={atend} onChange={e=>setAtend(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">DOC Fiscal</label><input value={doc} onChange={e=>setDoc(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Solicitante</label><input value={solic} onChange={e=>setSolic(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"/></div>
-                <div><label className="text-xs font-medium">Status</label><select value={statusSol} onChange={e=>setStatusSol(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>SOLICITADO</option><option>RECEBIDO</option><option>ATRASADO</option></select></div>
-                <div><label className="text-xs font-medium">Situação</label><select value={sit} onChange={e=>setSit(e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"><option>LIBERADO PARCIALMENTE</option><option>LIBERADO</option><option>BLOQUEADO</option></select></div>
-              </div>
-              <button onClick={addSol} className="mt-4 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">Salvar</button>
-            </div>
-          )}
-
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[1100px] text-sm">
-              <thead className="bg-slate-50"><tr className="border-b text-xs uppercase text-slate-500">
-                <th className="text-left p-3">Pedido BR</th><th className="text-left p-3">Data/Hora</th><th className="text-left p-3">Tipo</th><th className="text-right p-3">Qtd(L)</th><th className="text-right p-3">R$/L</th><th className="text-right p-3">Total</th><th className="text-left p-3">Solic.</th><th className="text-left p-3">Status</th><th className="text-left p-3">Situação</th><th className="text-left p-3">DOC</th><th></th>
-              </tr></thead>
-              <tbody>
-                {solList.map(s=>(
-                  <tr key={s.id} className="border-b hover:bg-slate-50">
-                    <td className="p-3 font-medium text-red-800">{s.pBr}</td>
-                    <td className="p-3">{new Date(s.dh).toLocaleString('pt-BR')}</td>
-                    <td className="p-3">{s.tipo}</td>
-                    <td className="p-3 text-right font-medium">{formatNumber(s.qt,0)}</td>
-                    <td className="p-3 text-right">{formatCurrency(s.prU)}</td>
-                    <td className="p-3 text-right font-bold">{formatCurrency(s.vT)}</td>
-                    <td className="p-3">{s.solic}</td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.st==='RECEBIDO'?'bg-green-100 text-green-800':s.st==='SOLICITADO'?'bg-amber-100 text-amber-800':'bg-red-100')}>{s.st}</span></td>
-                    <td className="p-3"><span className={cn("px-2 py-1 rounded text-xs", s.sit==='LIBERADO'?'bg-blue-100 text-blue-800':'bg-slate-100')}>{s.sit}</span></td>
-                    <td className="p-3">{s.doc||'-'}</td>
-                    <td className="p-3"><button onClick={()=>setSolList(prev=>prev.filter(x=>x.id!==s.id))} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="w-4 h-4"/></button></td>
-                  </tr>
-                ))}
-                {solList.length===0 && <tr><td colSpan={11} className="p-8 text-center text-slate-400">Nenhum registro</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Main render
   if (!currentUser) {
@@ -6362,7 +6253,6 @@ const handleRemoveAvatar = async () => {
     { id: 'preenchimento', label: 'Preenchimento', icon: FileInput },
     { id: 'import', label: 'Importação', icon: Upload },
     { id: 'export', label: 'Exportação', icon: Download },
-    { id: 'solicitacoes', label: 'Controle de Solicitações', icon: Briefcase },
   ];
 
   const adminNavItems = [
@@ -6528,7 +6418,6 @@ const handleRemoveAvatar = async () => {
                    currentPage === 'preenchimento' ? 'Preenchimento' :
                    currentPage === 'import' ? 'Importação' :
                    currentPage === 'export' ? 'Exportação' :
-                   currentPage === 'solicitacoes' ? 'Controle de Solicitações' :
                    currentPage === 'users' ? 'Usuários' : 'Sistema'}
                 </h2>
               </div>
@@ -6554,7 +6443,6 @@ const handleRemoveAvatar = async () => {
           {currentPage === 'preenchimento' && renderPreenchimento()}
           {currentPage === 'import' && renderImport()}
           {currentPage === 'export' && renderExport()}
-          {currentPage === 'solicitacoes' && renderSolicitacoes()}
           {currentPage === 'diesel' && renderDieselPrice()}
           {currentPage === 'users' && renderUsers()}
           {currentPage === 'profile' && renderProfile()}
