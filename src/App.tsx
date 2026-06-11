@@ -6849,7 +6849,6 @@ const renderSolicitacoes = () => {
                 <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:tracking-[0.22em]">Painel de controle</p>
                <h2 className="mt-1 truncate text-2xl font-semibold text-slate-900">
                   {currentPage === 'profile' ? 'Meu Perfil' :
-                   currentPage === 'solicitacoes' ? 'Solicitações' :
                    currentPage === 'diesel' ? 'Valor Diesel' :
                    currentPage === 'dashboard' ? 'Dashboard' :
                    currentPage === 'database' ? 'Base de Dados' :
@@ -6858,6 +6857,7 @@ const renderSolicitacoes = () => {
                    currentPage === 'equipments' ? 'Equipamentos' :
                    currentPage === 'history' ? 'Histórico' :
                    currentPage === 'preenchimento' ? 'Preenchimento' :
+                   currentPage === 'solicitacoes' ? 'Solicitações' :
                    currentPage === 'import' ? 'Importação' :
                    currentPage === 'export' ? 'Exportação' :
                    currentPage === 'users' ? 'Usuários' : 'Sistema'}
