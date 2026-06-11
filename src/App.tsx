@@ -577,7 +577,16 @@ export default function App() {
   const [editingSolicitacao, setEditingSolicitacao] = useState<Solicitacao | null>(null);
   const [showSolicitacaoForm, setShowSolicitacaoForm] = useState(false);
 
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [rateios, setRateios] = useState<Rateio[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
+  const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
+  const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
+
   // Supabase Data Fetching
+  
   
  useEffect(() => {
    // =============================================
@@ -712,6 +721,22 @@ export default function App() {
     )
     .subscribe();
 
+    // 7. SOLICITAÇÕES (COLE ESTE BLOCO INTEIRO)
+    const solChannel = supabase
+      .channel('realtime-solicitacoes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'solicitacoes' },
+        async () => {
+          const { data } = await supabase
+            .from('solicitacoes')
+            .select('*')
+            .order('id', { ascending: false });
+          if (data) setSolicitacoes(verificarAtrasados(data.map(mapSolicitacaoFromDb)));
+        }
+      )
+      .subscribe();
+
   // Cleanup - Remove todos os canais ao sair da página
   return () => {
     supabase.removeChannel(solChannel);
@@ -721,24 +746,9 @@ export default function App() {
     supabase.removeChannel(budgetsChannel);
     supabase.removeChannel(raiteiosChannel);
     supabase.removeChannel(dieselChannel);
+    supabase.removeChannel(solChannel);
   };
 }, []);
-
-  //Solicitações
-  const solChannel = supabase
-  .channel('realtime-solicitacoes')
-  .on(
-    'postgres_changes',
-    { event: '*', schema: 'public', table: 'solicitacoes' },
-    async () => {
-      const { data } = await supabase
-        .from('solicitacoes')
-        .select('*')
-        .order('id', { ascending: false });
-      if (data) setSolicitacoes(verificarAtrasados(data.map(mapSolicitacaoFromDb)));
-    }
-  )
-  .subscribe();
   
             useEffect(() => {
   async function loadData() {
@@ -828,14 +838,7 @@ export default function App() {
 
   loadData();
 }, []);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
-  const [rateios, setRateios] = useState<Rateio[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  // Adicione estes dois estados novos
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
-  const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
-  const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
