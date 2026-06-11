@@ -2,6 +2,28 @@ export type UserRole = 'admin' | 'operator' | 'supervisor';
 
 export type UserStatus = 'pending' | 'approved' | 'rejected';
 
+export type StatusSolicitacao = 'SOLICITADO' | 'RECEBIDO' | 'ATRASADO';
+
+export type SituacaoSolicitacao = 'LIBERADO' | 'LIBERADO PARCIALMENTE' | 'BLOQUEADO';
+
+export interface Solicitacao {
+  id: number;
+  numeroPedido: string;
+  precoUnitario: number;
+  valorTotal: number;
+  atendimento: string;
+  dataHoraSolicitacao: string;
+  dataProgramada: string;
+  quantidade: number;
+  tipoCombustivel: string;
+  docFiscal: string;
+  solicitante: string;
+  status: StatusSolicitacao;
+  situacao: SituacaoSolicitacao;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface User {
   id: number;
   username: string;
