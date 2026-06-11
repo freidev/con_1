@@ -577,6 +577,15 @@ export default function App() {
   const [editingSolicitacao, setEditingSolicitacao] = useState<Solicitacao | null>(null);
   const [showSolicitacaoForm, setShowSolicitacaoForm] = useState(false);
 
+  // Filtros da página de Solicitações
+  const [filtroSolicNumero, setFiltroSolicNumero] = useState('');
+  const [filtroSolicDocFiscal, setFiltroSolicDocFiscal] = useState('');
+  const [filtroSolicStatus, setFiltroSolicStatus] = useState<StatusSolicitacao | ''>('');
+  const [filtroSolicSituacao, setFiltroSolicSituacao] = useState<SituacaoSolicitacao | ''>('');
+  const [filtroSolicDataInicio, setFiltroSolicDataInicio] = useState('');
+  const [filtroSolicDataFim, setFiltroSolicDataFim] = useState('');
+  const [filtroSolicMes, setFiltroSolicMes] = useState('');
+
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [rateios, setRateios] = useState<Rateio[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -6334,325 +6343,356 @@ const handleRemoveAvatar = async () => {
   );
 
   // solicitações
-const renderSolicitacoes = () => {
-  const totalSolicitado = solicitacoes.reduce((sum, s) => sum + s.valorTotal, 0);
-  const totalRecebido = solicitacoes
-    .filter(s => s.status === 'RECEBIDO')
-    .reduce((sum, s) => sum + s.valorTotal, 0);
+ const renderSolicitacoes = () => {
+    // Pega valores únicos para os dropdowns (só os cadastrados)
+    const numerosPedido = [...new Set(solicitacoes.map(s => s.numeroPedido).filter(Boolean))].sort();
+    const docFiscais = [...new Set(solicitacoes.map(s => s.docFiscal).filter(Boolean))].sort();
+    const mesesDisponiveis = [...new Set(solicitacoes.map(s => {
+      if (!s.dataHoraSolicitacao) return '';
+      const d = new Date(s.dataHoraSolicitacao);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }).filter(Boolean))].sort().reverse();
 
-  const statusColors: Record<StatusSolicitacao, string> = {
-    SOLICITADO: 'bg-blue-100 text-blue-800',
-    RECEBIDO: 'bg-green-100 text-green-800',
-    ATRASADO: 'bg-red-100 text-red-800',
-  };
+    // Aplica os filtros
+    const solicitacoesFiltradas = solicitacoes.filter(s => {
+      if (filtroSolicNumero && s.numeroPedido !== filtroSolicNumero) return false;
+      if (filtroSolicDocFiscal && s.docFiscal !== filtroSolicDocFiscal) return false;
+      if (filtroSolicStatus && s.status !== filtroSolicStatus) return false;
+      if (filtroSolicSituacao && s.situacao !== filtroSolicSituacao) return false;
+      if (filtroSolicDataInicio && s.dataHoraSolicitacao) {
+        const dataS = s.dataHoraSolicitacao.split('T')[0];
+        if (dataS < filtroSolicDataInicio) return false;
+      }
+      if (filtroSolicDataFim && s.dataHoraSolicitacao) {
+        const dataS = s.dataHoraSolicitacao.split('T')[0];
+        if (dataS > filtroSolicDataFim) return false;
+      }
+      if (filtroSolicMes && s.dataHoraSolicitacao) {
+        const d = new Date(s.dataHoraSolicitacao);
+        const mesItem = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (mesItem !== filtroSolicMes) return false;
+      }
+      return true;
+    });
 
-  const situacaoColors: Record<SituacaoSolicitacao, string> = {
-    'LIBERADO': 'bg-green-100 text-green-800',
-    'LIBERADO PARCIALMENTE': 'bg-amber-100 text-amber-800',
-    'BLOQUEADO': 'bg-red-100 text-red-800',
-  };
+    // KPIs - baseados no filtro de mês (se houver) ou geral
+    const baseKPI = filtroSolicMes
+      ? solicitacoes.filter(s => {
+          if (!s.dataHoraSolicitacao) return false;
+          const d = new Date(s.dataHoraSolicitacao);
+          const mesItem = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return mesItem === filtroSolicMes;
+        })
+      : solicitacoes;
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-              <FileInput className="w-5 h-5 text-red-800" />
-              Controle de Solicitações
-            </h3>
-            <p className="text-sm text-slate-500">Pedidos de combustível com acompanhamento de status e situação</p>
-          </div>
-          <button
-            onClick={() => { setEditingSolicitacao(null); setShowSolicitacaoForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
-          >
-            <Plus className="w-4 h-4" />
-            Nova Solicitação
-          </button>
-        </div>
+    const totalSolicitado = baseKPI.reduce((sum, s) => sum + s.valorTotal, 0);
+    const totalRecebido = baseKPI
+      .filter(s => s.status === 'RECEBIDO')
+      .reduce((sum, s) => sum + s.valorTotal, 0);
+    const totalQuantidade = baseKPI.reduce((sum, s) => sum + s.quantidade, 0);
 
-        {/* Cards de totais */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl bg-blue-50 p-4">
-            <p className="text-sm text-blue-600 mb-1">Total Solicitado</p>
-            <p className="text-2xl font-bold text-blue-800">{formatCurrency(totalSolicitado)}</p>
-          </div>
-          <div className="rounded-xl bg-green-50 p-4">
-            <p className="text-sm text-green-600 mb-1">Total Recebido</p>
-            <p className="text-2xl font-bold text-green-800">{formatCurrency(totalRecebido)}</p>
-          </div>
-          <div className="rounded-xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-600 mb-1">Total de Pedidos</p>
-            <p className="text-2xl font-bold text-slate-800">{solicitacoes.length}</p>
-          </div>
-        </div>
-      </div>
+    // Label do mês selecionado
+    const getMesLabel = (mes: string) => {
+      if (!mes) return '';
+      const [ano, m] = mes.split('-');
+      const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      return `${meses[parseInt(m) - 1]} / ${ano}`;
+    };
 
-      {showSolicitacaoForm && (
-        <SolicitacaoForm
-          initialData={editingSolicitacao}
-          onSave={async (s) => {
-            if (editingSolicitacao) {
-              await handleUpdateSolicitacao({ ...editingSolicitacao, ...s });
-            } else {
-              await handleAddSolicitacao(s as any);
-            }
-            setShowSolicitacaoForm(false);
-            setEditingSolicitacao(null);
-          }}
-          onCancel={() => { setShowSolicitacaoForm(false); setEditingSolicitacao(null); }}
-        />
-      )}
+    const limparFiltros = () => {
+      setFiltroSolicNumero('');
+      setFiltroSolicDocFiscal('');
+      setFiltroSolicStatus('');
+      setFiltroSolicSituacao('');
+      setFiltroSolicDataInicio('');
+      setFiltroSolicDataFim('');
+      setFiltroSolicMes('');
+    };
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[1200px] w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Pedido BR</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Solicitante</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Combustível</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Qtd.</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Preço Un.</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Valor Total</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Solicitação</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Programada</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Atendimento</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">DOC Fiscal</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Status</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Situação</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitacoes.length > 0 ? (
-                solicitacoes.map(s => (
-                  <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-3 px-4 text-sm font-medium text-red-800">{s.numeroPedido}</td>
-                    <td className="py-3 px-4 text-sm text-slate-700">{s.solicitante}</td>
-                    <td className="py-3 px-4 text-sm text-slate-700">{s.tipoCombustivel}</td>
-                    <td className="py-3 px-4 text-sm text-right text-slate-700">{formatNumber(s.quantidade, 2)}</td>
-                    <td className="py-3 px-4 text-sm text-right text-slate-700">{formatCurrency(s.precoUnitario)}</td>
-                    <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900">{formatCurrency(s.valorTotal)}</td>
-                    <td className="py-3 px-4 text-sm text-slate-600">
-                      {s.dataHoraSolicitacao ? new Date(s.dataHoraSolicitacao).toLocaleString('pt-BR') : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-slate-600">{s.dataProgramada || '-'}</td>
-                    <td className="py-3 px-4 text-sm text-slate-600">{s.atendimento || '-'}</td>
-                    <td className="py-3 px-4 text-sm text-slate-600">{s.docFiscal || '-'}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[s.status]}`}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${situacaoColors[s.situacao]}`}>
-                        {s.situacao}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setEditingSolicitacao(s); setShowSolicitacaoForm(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSolicitacao(s.id)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={13} className="py-12 text-center text-slate-400">
-                    Nenhuma solicitação cadastrada
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-  const renderExport = () => {
-    const selectedFormat = EXPORT_FORMAT_OPTIONS.find((option) => option.id === exportFormat)!;
-    const isBaseFormat = exportFormat === 'base';
+    const filtrosAtivos = [
+      filtroSolicNumero, filtroSolicDocFiscal, filtroSolicStatus,
+      filtroSolicSituacao, filtroSolicDataInicio, filtroSolicDataFim, filtroSolicMes
+    ].filter(Boolean).length;
 
     return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <FileOutput className="h-5 w-5" />
-            </div>
+      <div className="space-y-6">
+        {/* ========== CABEÇALHO + KPIs ========== */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-slate-800">Exportação de Dados</h3>
-              <p className="text-sm text-slate-500">Gere arquivos .xlsx prontos para Excel com filtros e formatos personalizados</p>
+              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                <FileInput className="w-5 h-5 text-red-800" />
+                Controle de Solicitações
+              </h3>
+              <p className="text-sm text-slate-500">
+                Pedidos de combustível com acompanhamento de status e situação
+                {filtroSolicMes && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                    📅 {getMesLabel(filtroSolicMes)}
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => { setEditingSolicitacao(null); setShowSolicitacaoForm(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
+            >
+              <Plus className="w-4 h-4" />
+              Nova Solicitação
+            </button>
+          </div>
+
+          {/* 4 KPIs */}
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl bg-blue-50 p-4">
+              <p className="text-sm text-blue-600 mb-1">Total Solicitado</p>
+              <p className="text-2xl font-bold text-blue-800">{formatCurrency(totalSolicitado)}</p>
+            </div>
+            <div className="rounded-xl bg-green-50 p-4">
+              <p className="text-sm text-green-600 mb-1">Total Recebido</p>
+              <p className="text-2xl font-bold text-green-800">{formatCurrency(totalRecebido)}</p>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-4">
+              <p className="text-sm text-amber-600 mb-1">QTD. Total</p>
+              <p className="text-2xl font-bold text-amber-800">{formatNumber(totalQuantidade, 2)} L</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-600 mb-1">Total de Pedidos</p>
+              <p className="text-2xl font-bold text-slate-800">{baseKPI.length}</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px,1fr]">
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <FileOutput className="h-4 w-4 text-blue-600" />
-                Formato de Exportação
-              </h4>
-              <div className="space-y-2">
-                {EXPORT_FORMAT_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setExportFormat(option.id)}
-                    className={cn(
-                      'w-full rounded-lg border px-4 py-3 text-left transition',
-                      exportFormat === option.id
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-slate-200 bg-white hover:bg-slate-50',
-                    )}
-                  >
-                    <p className="text-sm font-medium text-slate-800">{option.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{option.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h4 className="mb-3 text-sm font-semibold text-slate-700">Nome do Arquivo</h4>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={exportFileName}
-                  onChange={(e) => setExportFileName(cleanText(e.target.value))}
-                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-                />
-                <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">.xlsx</span>
-              </div>
-              <p className="mt-3 text-xs text-slate-400">
-                Será salvo como: {cleanText(exportFileName || 'controle_abastecimento')}_{new Date().toISOString().slice(0, 10)}.xlsx
-              </p>
-            </div>
+        {/* ========== FILTROS ========== */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <Filter className="h-4 w-4 text-red-800" />
+              Filtros
+              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {filtrosAtivos} ativo{filtrosAtivos !== 1 ? 's' : ''}
+              </span>
+            </h4>
+            <button
+              onClick={limparFiltros}
+              disabled={filtrosAtivos === 0}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+              Limpar filtros
+            </button>
           </div>
 
-          <div className="space-y-4">
-           
-            {isBaseFormat && (
-              <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" open>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-slate-700">
-                  <span className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-slate-500" />
-                    Selecionar Colunas para Exportar
-                  </span>
-                  <span className="text-xs text-slate-400">{selectedBaseColumns.length}/{BASE_EXPORT_COLUMNS.length} selecionadas</span>
-                </summary>
-                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
-                  {BASE_EXPORT_COLUMNS.map((column) => (
-                    <label key={column.key} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={selectedBaseColumns.includes(column.key)}
-                        onChange={() => toggleBaseExportColumn(column.key)}
-                        className="h-4 w-4 rounded border-slate-300 text-red-800 focus:ring-red-800/30"
-                      />
-                      <span>{column.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </details>
-            )}
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <FileOutput className="h-4 w-4 text-emerald-600" />
-                Resumo da Exportação
-              </h4>
-
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <div className="rounded-xl bg-blue-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-700">{exportPreview.records}</p>
-                  <p className="text-xs text-blue-500">Registros</p>
-                </div>
-                <div className="rounded-xl bg-emerald-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-emerald-700">{formatNumber(exportPreview.litros, 0)}</p>
-                  <p className="text-xs text-emerald-500">Litros</p>
-                </div>
-                <div className="rounded-xl bg-amber-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-amber-700">{formatCurrency(exportPreview.valor)}</p>
-                  <p className="text-xs text-amber-500">Valor Total</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-700">{exportPreview.columns.length}</p>
-                  <p className="text-xs text-slate-500">Colunas</p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-slate-50 p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Colunas na planilha</p>
-                <div className="flex flex-wrap gap-2">
-                  {exportPreview.columns.map((column) => (
-                    <span key={column} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600">
-                      {column}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-slate-50 p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Abas que serão criadas no XLSX</p>
-                <div className="flex flex-wrap gap-2">
-                  {exportPreview.sheetNames.map((sheet) => (
-                    <span
-                      key={sheet}
-                      className={cn(
-                        'rounded-md px-2 py-1 text-[11px] font-medium',
-                        sheet === selectedFormat.sheetName ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600',
-                      )}
-                    >
-                      {sheet}
-                    </span>
-                  ))}
-                </div>
-              </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Pedido BR */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Pedido BR</label>
+              <select
+                value={filtroSolicNumero}
+                onChange={(e) => setFiltroSolicNumero(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Todos os pedidos</option>
+                {numerosPedido.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </div>
 
-            <button
-              onClick={handleExportExcelFile}
-              disabled={exportPreview.rows.length === 0 || exportPreview.columns.length === 0}
-              className={cn(
-                'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm font-medium transition',
-                exportPreview.rows.length === 0 || exportPreview.columns.length === 0
-                  ? 'cursor-not-allowed bg-slate-200 text-slate-400'
-                  : 'bg-blue-600 text-white hover:bg-blue-700',
-              )}
-            >
-              <Download className="h-5 w-5" />
-              Exportar para Excel (.xlsx)
-            </button>
+            {/* DOC Fiscal */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">DOC Fiscal</label>
+              <select
+                value={filtroSolicDocFiscal}
+                onChange={(e) => setFiltroSolicDocFiscal(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Todos os documentos</option>
+                {docFiscais.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
 
-            {exportPreview.rows.length === 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                <AlertCircle className="h-4 w-4" />
-                Nenhum dado encontrado com os filtros aplicados.
-              </div>
-            )}
+            {/* Status */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Status</label>
+              <select
+                value={filtroSolicStatus}
+                onChange={(e) => setFiltroSolicStatus(e.target.value as StatusSolicitacao)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Todos os status</option>
+                <option value="SOLICITADO">SOLICITADO</option>
+                <option value="RECEBIDO">RECEBIDO</option>
+                <option value="ATRASADO">ATRASADO</option>
+              </select>
+            </div>
+
+            {/* Situação */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Situação</label>
+              <select
+                value={filtroSolicSituacao}
+                onChange={(e) => setFiltroSolicSituacao(e.target.value as SituacaoSolicitacao)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Todas as situações</option>
+                <option value="LIBERADO">LIBERADO</option>
+                <option value="LIBERADO PARCIALMENTE">LIBERADO PARCIALMENTE</option>
+                <option value="BLOQUEADO">BLOQUEADO</option>
+              </select>
+            </div>
+
+            {/* Mês */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Mês</label>
+              <select
+                value={filtroSolicMes}
+                onChange={(e) => setFiltroSolicMes(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              >
+                <option value="">Todos os meses</option>
+                {mesesDisponiveis.map(m => (
+                  <option key={m} value={m}>{getMesLabel(m)}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Data Início */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Data Início</label>
+              <input
+                type="date"
+                value={filtroSolicDataInicio}
+                onChange={(e) => setFiltroSolicDataInicio(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              />
+            </div>
+
+            {/* Data Fim */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Data Fim</label>
+              <input
+                type="date"
+                value={filtroSolicDataFim}
+                onChange={(e) => setFiltroSolicDataFim(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ========== FORMULÁRIO (quando aberto) ========== */}
+        {showSolicitacaoForm && (
+          <SolicitacaoForm
+            initialData={editingSolicitacao}
+            onSave={async (s) => {
+              if (editingSolicitacao) {
+                await handleUpdateSolicitacao({ ...editingSolicitacao, ...s });
+              } else {
+                await handleAddSolicitacao(s as any);
+              }
+              setShowSolicitacaoForm(false);
+              setEditingSolicitacao(null);
+            }}
+            onCancel={() => { setShowSolicitacaoForm(false); setEditingSolicitacao(null); }}
+          />
+        )}
+
+        {/* ========== TABELA ========== */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs text-slate-600">
+              Mostrando <strong>{solicitacoesFiltradas.length}</strong> de <strong>{solicitacoes.length}</strong> solicitações
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[1200px] w-full">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Pedido BR</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Solicitante</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Combustível</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Qtd.</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Preço Un.</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Valor Total</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Solicitação</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Programada</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Atendimento</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">DOC Fiscal</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Situação</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {solicitacoesFiltradas.length > 0 ? (
+                  solicitacoesFiltradas.map(s => (
+                    <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4 text-sm font-medium text-red-800">{s.numeroPedido}</td>
+                      <td className="py-3 px-4 text-sm text-slate-700">{s.solicitante}</td>
+                      <td className="py-3 px-4 text-sm text-slate-700">{s.tipoCombustivel}</td>
+                      <td className="py-3 px-4 text-sm text-right text-slate-700">{formatNumber(s.quantidade, 2)}</td>
+                      <td className="py-3 px-4 text-sm text-right text-slate-700">{formatCurrency(s.precoUnitario)}</td>
+                      <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900">{formatCurrency(s.valorTotal)}</td>
+                      <td className="py-3 px-4 text-sm text-slate-600">
+                        {s.dataHoraSolicitacao ? new Date(s.dataHoraSolicitacao).toLocaleString('pt-BR') : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-slate-600">{s.dataProgramada || '-'}</td>
+                      <td className="py-3 px-4 text-sm text-slate-600">{s.atendimento || '-'}</td>
+                      <td className="py-3 px-4 text-sm text-slate-600">{s.docFiscal || '-'}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          s.status === 'RECEBIDO' ? 'bg-green-100 text-green-800' :
+                          s.status === 'ATRASADO' ? 'bg-red-100 text-red-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          s.situacao === 'LIBERADO' ? 'bg-green-100 text-green-800' :
+                          s.situacao === 'LIBERADO PARCIALMENTE' ? 'bg-amber-100 text-amber-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {s.situacao}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setEditingSolicitacao(s); setShowSolicitacaoForm(true); }}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSolicitacao(s.id)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={13} className="py-12 text-center text-slate-400">
+                      Nenhuma solicitação encontrada com os filtros aplicados
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     );
   };
-
   // Main render
   if (!currentUser) {
     return (
