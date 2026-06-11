@@ -1,5 +1,9 @@
 import emailjs from '@emailjs/browser';
 import { useState, useMemo, useEffect } from 'react';
+import type {User, UserRole, UserStatus, Equipment, Rateio, RateioItem,
+  Budget, Abastecimento, DieselPrice, FilterState, Notification,
+  Solicitacao, StatusSolicitacao, SituacaoSolicitacao
+} from './types';
 import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Database, Wallet, Scale, Wrench, History, 
@@ -205,6 +209,38 @@ function mapEquipmentFromDb(dbRecord: any): Equipment {
   };
 }
 
+// Função de mapeamento de solicitações
+function mapSolicitacaoFromDb(dbRecord: any): Solicitacao {
+  return {
+    id: dbRecord.id,
+    numeroPedido: dbRecord.numero_pedido ?? '',
+    precoUnitario: Number(dbRecord.preco_unitario) || 0,
+    valorTotal: Number(dbRecord.valor_total) || 0,
+    atendimento: dbRecord.atendimento ?? '',
+    dataHoraSolicitacao: dbRecord.data_hora_solicitacao ?? '',
+    dataProgramada: dbRecord.data_programada ?? '',
+    quantidade: Number(dbRecord.quantidade) || 0,
+    tipoCombustivel: dbRecord.tipo_combustivel ?? '',
+    docFiscal: dbRecord.doc_fiscal ?? '',
+    solicitante: dbRecord.solicitante ?? '',
+    status: (dbRecord.status ?? 'SOLICITADO') as StatusSolicitacao,
+    situacao: (dbRecord.situacao ?? 'LIBERADO') as SituacaoSolicitacao,
+    createdBy: dbRecord.created_by ?? '',
+    createdAt: dbRecord.created_at ?? new Date().toISOString(),
+  };
+}
+
+//função que verifica automaticamente se está ATRASADO
+const verificarAtrasados = (lista: Solicitacao[]) => {
+  const hoje = new Date().toISOString().split('T')[0];
+  return lista.map(s => {
+    if (s.status === 'SOLICITADO' && s.dataProgramada && s.dataProgramada < hoje) {
+      return { ...s, status: 'ATRASADO' as StatusSolicitacao };
+    }
+    return s;
+  });
+};
+//
 function getMonthLabel(value: string) {
   const monthNames = [
     'Janeiro',
@@ -536,6 +572,11 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
+  // Estado Solicitações
+  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
+  const [editingSolicitacao, setEditingSolicitacao] = useState<Solicitacao | null>(null);
+  const [showSolicitacaoForm, setShowSolicitacaoForm] = useState(false);
+
   // Supabase Data Fetching
   
  useEffect(() => {
@@ -673,6 +714,7 @@ export default function App() {
 
   // Cleanup - Remove todos os canais ao sair da página
   return () => {
+    supabase.removeChannel(solChannel);
     supabase.removeChannel(usersChannel);
     supabase.removeChannel(absChannel);
     supabase.removeChannel(eqChannel);
@@ -681,6 +723,22 @@ export default function App() {
     supabase.removeChannel(dieselChannel);
   };
 }, []);
+
+  //Solicitações
+  const solChannel = supabase
+  .channel('realtime-solicitacoes')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'solicitacoes' },
+    async () => {
+      const { data } = await supabase
+        .from('solicitacoes')
+        .select('*')
+        .order('id', { ascending: false });
+      if (data) setSolicitacoes(verificarAtrasados(data.map(mapSolicitacaoFromDb)));
+    }
+  )
+  .subscribe();
   
             useEffect(() => {
   async function loadData() {
@@ -701,6 +759,13 @@ export default function App() {
     } else if (uData && uData.length > 0) {
       setUsers(uData.map(mapUserFromDb));
     }
+
+    // Carregar Solicitações
+  const { data: solData } = await supabase
+    .from('solicitacoes')
+    .select('*')
+    .order('id', { ascending: false });
+  if (solData) setSolicitacoes(verificarAtrasados(solData.map(mapSolicitacaoFromDb)));
 
     // Carregar Abastecimentos
     const { data: absData } = await supabase
@@ -1176,6 +1241,74 @@ const handleResetPassword = async () => {
     setCurrentPage('login');
     addNotification('info', 'Você saiu do sistema');
   };
+
+  // ADD funções de CRUD
+  const handleAddSolicitacao = async (s: Omit<Solicitacao, 'id' | 'createdAt' | 'valorTotal' | 'createdBy'>) => {
+  const valorTotal = s.precoUnitario * s.quantidade;
+  const payload = {
+    numero_pedido: cleanText(s.numeroPedido),
+    preco_unitario: s.precoUnitario,
+    valor_total: valorTotal,
+    atendimento: cleanText(s.atendimento),
+    data_hora_solicitacao: s.dataHoraSolicitacao || new Date().toISOString(),
+    data_programada: s.dataProgramada || null,
+    quantidade: s.quantidade,
+    tipo_combustivel: cleanText(s.tipoCombustivel),
+    doc_fiscal: cleanText(s.docFiscal),
+    solicitante: cleanText(s.solicitante),
+    status: s.status,
+    situacao: s.situacao,
+    created_by: cleanText(currentUser?.name || 'Unknown'),
+    created_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase.from('solicitacoes').insert([payload]).select();
+  if (error) {
+    addNotification('error', `Erro ao salvar: ${error.message}`);
+    return;
+  }
+  if (data) {
+    setSolicitacoes(prev => [mapSolicitacaoFromDb(data[0]), ...prev]);
+    addNotification('success', 'Solicitação cadastrada com sucesso!');
+  }
+};
+
+const handleDeleteSolicitacao = async (id: number) => {
+  if (!window.confirm('Excluir esta solicitação?')) return;
+  const { error } = await supabase.from('solicitacoes').delete().eq('id', id);
+  if (error) {
+    addNotification('error', `Erro: ${error.message}`);
+    return;
+  }
+  setSolicitacoes(prev => prev.filter(s => s.id !== id));
+  addNotification('success', 'Solicitação excluída!');
+};
+
+const handleUpdateSolicitacao = async (s: Solicitacao) => {
+  const valorTotal = s.precoUnitario * s.quantidade;
+  const payload = {
+    numero_pedido: cleanText(s.numeroPedido),
+    preco_unitario: s.precoUnitario,
+    valor_total: valorTotal,
+    atendimento: cleanText(s.atendimento),
+    data_hora_solicitacao: s.dataHoraSolicitacao,
+    data_programada: s.dataProgramada || null,
+    quantidade: s.quantidade,
+    tipo_combustivel: cleanText(s.tipoCombustivel),
+    doc_fiscal: cleanText(s.docFiscal),
+    solicitante: cleanText(s.solicitante),
+    status: s.status,
+    situacao: s.situacao,
+  };
+  const { error } = await supabase.from('solicitacoes').update(payload).eq('id', s.id);
+  if (error) {
+    addNotification('error', `Erro: ${error.message}`);
+    return;
+  }
+  setSolicitacoes(prev => prev.map(item => item.id === s.id ? { ...s, valorTotal } : item));
+  setEditingSolicitacao(null);
+  addNotification('success', 'Solicitação atualizada!');
+};
 
   // Add equipment
   const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
@@ -6244,6 +6377,7 @@ const handleRemoveAvatar = async () => {
   }
 
   const navItems = [
+    { id: 'solicitacoes', label: 'Solicitações', icon: FileInput },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'database', label: 'Base de Dados', icon: Database },
     { id: 'budget', label: 'Orçamento', icon: Wallet },
@@ -6294,7 +6428,7 @@ const handleRemoveAvatar = async () => {
                 {navItems
                   .filter(item => {
                     if (currentUser?.role === 'admin') return true;
-                    if (currentUser?.role === 'supervisor') return ['dashboard','database', 'budget','equipments', 'history','preenchimento','import', 'export', 'diesel'].includes(item.id);
+                    if (currentUser?.role === 'supervisor') return ['dashboard','database', 'budget','equipments', 'history','preenchimento','import', 'export', 'diesel','solicitacoes'].includes(item.id);
                     return item.id === 'preenchimento';
                   })
                   .map(item => {
@@ -6408,6 +6542,7 @@ const handleRemoveAvatar = async () => {
                 <p className="truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:tracking-[0.22em]">Painel de controle</p>
                <h2 className="mt-1 truncate text-2xl font-semibold text-slate-900">
                   {currentPage === 'profile' ? 'Meu Perfil' :
+                   currentPage === 'solicitacoes' ? 'Solicitações' :
                    currentPage === 'diesel' ? 'Valor Diesel' :
                    currentPage === 'dashboard' ? 'Dashboard' :
                    currentPage === 'database' ? 'Base de Dados' :
@@ -6434,6 +6569,7 @@ const handleRemoveAvatar = async () => {
         </div>
 
         <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 sm:p-4 lg:p-6">
+          {currentPage === 'solicitacoes' && renderSolicitacoes()}
           {currentPage === 'dashboard' && renderDashboard()}
           {currentPage === 'database' && renderDatabase()}
           {currentPage === 'budget' && renderBudget()}
@@ -6481,4 +6617,305 @@ const handleRemoveAvatar = async () => {
       </div>
     </div>
   );
-}
+};
+
+//SolicitacaoForm
+const SolicitacaoForm = ({ initialData, onSave, onCancel }: {
+  initialData?: Solicitacao | null;
+  onSave: (s: any) => void;
+  onCancel: () => void;
+}) => {
+  const [numeroPedido, setNumeroPedido] = useState(initialData?.numeroPedido || '');
+  const [precoUnitario, setPrecoUnitario] = useState(initialData?.precoUnitario.toString() || '');
+  const [quantidade, setQuantidade] = useState(initialData?.quantidade.toString() || '');
+  const [atendimento, setAtendimento] = useState(initialData?.atendimento || '');
+  const [dataHoraSolicitacao, setDataHoraSolicitacao] = useState(
+    initialData?.dataHoraSolicitacao ? initialData.dataHoraSolicitacao.slice(0, 16) : ''
+  );
+  const [dataProgramada, setDataProgramada] = useState(initialData?.dataProgramada || '');
+  const [tipoCombustivel, setTipoCombustivel] = useState(initialData?.tipoCombustivel || 'Diesel S10');
+  const [docFiscal, setDocFiscal] = useState(initialData?.docFiscal || '');
+  const [solicitante, setSolicitante] = useState(initialData?.solicitante || currentUser?.name || '');
+  const [status, setStatus] = useState<StatusSolicitacao>(initialData?.status || 'SOLICITADO');
+  const [situacao, setSituacao] = useState<SituacaoSolicitacao>(initialData?.situacao || 'LIBERADO');
+
+  const valorTotal = (parseFloat(precoUnitario) || 0) * (parseFloat(quantidade) || 0);
+
+  const handleSubmit = () => {
+    if (!numeroPedido || !precoUnitario || !quantidade) {
+      alert('Preencha pelo menos: Pedido, Preço Unitário e Quantidade');
+      return;
+    }
+    onSave({
+      numeroPedido,
+      precoUnitario: parseFloat(precoUnitario),
+      valorTotal,
+      atendimento,
+      dataHoraSolicitacao: dataHoraSolicitacao || new Date().toISOString(),
+      dataProgramada,
+      quantidade: parseFloat(quantidade),
+      tipoCombustivel,
+      docFiscal,
+      solicitante,
+      status,
+      situacao,
+    });
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
+      <div className="mb-5 flex items-center justify-between">
+        <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          {initialData ? <Pencil className="h-4 w-4 text-blue-600" /> : <Plus className="h-4 w-4 text-blue-600" />}
+          {initialData ? 'Editar Solicitação' : 'Nova Solicitação'}
+        </h4>
+        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Nº Pedido BR *</label>
+          <input type="text" value={numeroPedido} onChange={e => setNumeroPedido(e.target.value)}
+            placeholder="Ex: 4500012345"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Solicitante *</label>
+          <input type="text" value={solicitante} onChange={e => setSolicitante(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Combustível *</label>
+          <select value={tipoCombustivel} onChange={e => setTipoCombustivel(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
+            <option value="Diesel S10">Diesel S10</option>
+            <option value="Diesel S500">Diesel S500</option>
+            <option value="Gasolina">Gasolina</option>
+            <option value="Etanol">Etanol</option>
+            <option value="ARLA 32">ARLA 32</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade *</label>
+          <input type="number" step="0.01" value={quantidade} onChange={e => setQuantidade(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Preço Unitário (R$) *</label>
+          <input type="number" step="0.01" value={precoUnitario} onChange={e => setPrecoUnitario(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total</label>
+          <input type="text" value={formatCurrency(valorTotal)} disabled
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-600 font-semibold" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Data/Hora Solicitação</label>
+          <input type="datetime-local" value={dataHoraSolicitacao} onChange={e => setDataHoraSolicitacao(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Data Programada</label>
+          <input type="date" value={dataProgramada} onChange={e => setDataProgramada(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Atendimento</label>
+          <input type="text" value={atendimento} onChange={e => setAtendimento(e.target.value)}
+            placeholder="Ex: Filial SP, Usina..."
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">DOC Fiscal</label>
+          <input type="text" value={docFiscal} onChange={e => setDocFiscal(e.target.value)}
+            placeholder="Ex: NF 12345"
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+          <select value={status} onChange={e => setStatus(e.target.value as StatusSolicitacao)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
+            <option value="SOLICITADO">SOLICITADO</option>
+            <option value="RECEBIDO">RECEBIDO</option>
+            <option value="ATRASADO">ATRASADO</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Situação do Pedido</label>
+          <select value={situacao} onChange={e => setSituacao(e.target.value as SituacaoSolicitacao)}
+            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
+            <option value="LIBERADO">LIBERADO</option>
+            <option value="LIBERADO PARCIALMENTE">LIBERADO PARCIALMENTE</option>
+            <option value="BLOQUEADO">BLOQUEADO</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-5">
+        <button onClick={handleSubmit}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center gap-2">
+          <Check className="w-4 h-4" />
+          {initialData ? 'Salvar alterações' : 'Cadastrar solicitação'}
+        </button>
+        <button onClick={onCancel}
+          className="px-6 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// solicitações
+const renderSolicitacoes = () => {
+  const totalSolicitado = solicitacoes.reduce((sum, s) => sum + s.valorTotal, 0);
+  const totalRecebido = solicitacoes
+    .filter(s => s.status === 'RECEBIDO')
+    .reduce((sum, s) => sum + s.valorTotal, 0);
+
+  const statusColors: Record<StatusSolicitacao, string> = {
+    SOLICITADO: 'bg-blue-100 text-blue-800',
+    RECEBIDO: 'bg-green-100 text-green-800',
+    ATRASADO: 'bg-red-100 text-red-800',
+  };
+
+  const situacaoColors: Record<SituacaoSolicitacao, string> = {
+    'LIBERADO': 'bg-green-100 text-green-800',
+    'LIBERADO PARCIALMENTE': 'bg-amber-100 text-amber-800',
+    'BLOQUEADO': 'bg-red-100 text-red-800',
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+              <FileInput className="w-5 h-5 text-red-800" />
+              Controle de Solicitações
+            </h3>
+            <p className="text-sm text-slate-500">Pedidos de combustível com acompanhamento de status e situação</p>
+          </div>
+          <button
+            onClick={() => { setEditingSolicitacao(null); setShowSolicitacaoForm(true); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
+          >
+            <Plus className="w-4 h-4" />
+            Nova Solicitação
+          </button>
+        </div>
+
+        {/* Cards de totais */}
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl bg-blue-50 p-4">
+            <p className="text-sm text-blue-600 mb-1">Total Solicitado</p>
+            <p className="text-2xl font-bold text-blue-800">{formatCurrency(totalSolicitado)}</p>
+          </div>
+          <div className="rounded-xl bg-green-50 p-4">
+            <p className="text-sm text-green-600 mb-1">Total Recebido</p>
+            <p className="text-2xl font-bold text-green-800">{formatCurrency(totalRecebido)}</p>
+          </div>
+          <div className="rounded-xl bg-slate-50 p-4">
+            <p className="text-sm text-slate-600 mb-1">Total de Pedidos</p>
+            <p className="text-2xl font-bold text-slate-800">{solicitacoes.length}</p>
+          </div>
+        </div>
+      </div>
+
+      {showSolicitacaoForm && (
+        <SolicitacaoForm
+          initialData={editingSolicitacao}
+          onSave={async (s) => {
+            if (editingSolicitacao) {
+              await handleUpdateSolicitacao({ ...editingSolicitacao, ...s });
+            } else {
+              await handleAddSolicitacao(s as any);
+            }
+            setShowSolicitacaoForm(false);
+            setEditingSolicitacao(null);
+          }}
+          onCancel={() => { setShowSolicitacaoForm(false); setEditingSolicitacao(null); }}
+        />
+      )}
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-[1200px] w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Pedido BR</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Solicitante</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Combustível</th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Qtd.</th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Preço Un.</th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Valor Total</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Solicitação</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Programada</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Atendimento</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">DOC Fiscal</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Status</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Situação</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {solicitacoes.length > 0 ? (
+                solicitacoes.map(s => (
+                  <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-3 px-4 text-sm font-medium text-red-800">{s.numeroPedido}</td>
+                    <td className="py-3 px-4 text-sm text-slate-700">{s.solicitante}</td>
+                    <td className="py-3 px-4 text-sm text-slate-700">{s.tipoCombustivel}</td>
+                    <td className="py-3 px-4 text-sm text-right text-slate-700">{formatNumber(s.quantidade, 2)}</td>
+                    <td className="py-3 px-4 text-sm text-right text-slate-700">{formatCurrency(s.precoUnitario)}</td>
+                    <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900">{formatCurrency(s.valorTotal)}</td>
+                    <td className="py-3 px-4 text-sm text-slate-600">
+                      {s.dataHoraSolicitacao ? new Date(s.dataHoraSolicitacao).toLocaleString('pt-BR') : '-'}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600">{s.dataProgramada || '-'}</td>
+                    <td className="py-3 px-4 text-sm text-slate-600">{s.atendimento || '-'}</td>
+                    <td className="py-3 px-4 text-sm text-slate-600">{s.docFiscal || '-'}</td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[s.status]}`}>
+                        {s.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${situacaoColors[s.situacao]}`}>
+                        {s.situacao}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditingSolicitacao(s); setShowSolicitacaoForm(true); }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSolicitacao(s.id)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={13} className="py-12 text-center text-slate-400">
+                    Nenhuma solicitação cadastrada
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
