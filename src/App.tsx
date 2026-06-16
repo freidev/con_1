@@ -1,9 +1,5 @@
 import emailjs from '@emailjs/browser';
 import { useState, useMemo, useEffect } from 'react';
-import type {User, UserRole, UserStatus, Equipment, Rateio, RateioItem,
-  Budget, Abastecimento, DieselPrice, FilterState, Notification,
-  Solicitacao, StatusSolicitacao, SituacaoSolicitacao
-} from './types';
 import { supabase } from './supabaseClient';
 import { 
   LayoutDashboard, Database, Wallet, Scale, Wrench, History, 
@@ -209,38 +205,6 @@ function mapEquipmentFromDb(dbRecord: any): Equipment {
   };
 }
 
-// Função de mapeamento de solicitações
-function mapSolicitacaoFromDb(dbRecord: any): Solicitacao {
-  return {
-    id: dbRecord.id,
-    numeroPedido: dbRecord.numero_pedido ?? '',
-    precoUnitario: Number(dbRecord.preco_unitario) || 0,
-    valorTotal: Number(dbRecord.valor_total) || 0,
-    atendimento: dbRecord.atendimento ?? '',
-    dataHoraSolicitacao: dbRecord.data_hora_solicitacao ?? '',
-    dataProgramada: dbRecord.data_programada ?? '',
-    quantidade: Number(dbRecord.quantidade) || 0,
-    tipoCombustivel: dbRecord.tipo_combustivel ?? '',
-    docFiscal: dbRecord.doc_fiscal ?? '',
-    solicitante: dbRecord.solicitante ?? '',
-    status: (dbRecord.status ?? 'SOLICITADO') as StatusSolicitacao,
-    situacao: (dbRecord.situacao ?? 'LIBERADO') as SituacaoSolicitacao,
-    createdBy: dbRecord.created_by ?? '',
-    createdAt: dbRecord.created_at ?? new Date().toISOString(),
-  };
-}
-
-//função que verifica automaticamente se está ATRASADO
-const verificarAtrasados = (lista: Solicitacao[]) => {
-  const hoje = new Date().toISOString().split('T')[0];
-  return lista.map(s => {
-    if (s.status === 'SOLICITADO' && s.dataProgramada && s.dataProgramada < hoje) {
-      return { ...s, status: 'ATRASADO' as StatusSolicitacao };
-    }
-    return s;
-  });
-};
-//
 function getMonthLabel(value: string) {
   const monthNames = [
     'Janeiro',
@@ -572,30 +536,7 @@ export default function App() {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
-  // Estado Solicitações
-  const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
-  const [editingSolicitacao, setEditingSolicitacao] = useState<Solicitacao | null>(null);
-  const [showSolicitacaoForm, setShowSolicitacaoForm] = useState(false);
-
-  // Filtros da página de Solicitações
-  const [filtroSolicNumero, setFiltroSolicNumero] = useState('');
-  const [filtroSolicDocFiscal, setFiltroSolicDocFiscal] = useState('');
-  const [filtroSolicStatus, setFiltroSolicStatus] = useState<StatusSolicitacao | ''>('');
-  const [filtroSolicSituacao, setFiltroSolicSituacao] = useState<SituacaoSolicitacao | ''>('');
-  const [filtroSolicDataInicio, setFiltroSolicDataInicio] = useState('');
-  const [filtroSolicDataFim, setFiltroSolicDataFim] = useState('');
-  const [filtroSolicMes, setFiltroSolicMes] = useState('');
-
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
-  const [rateios, setRateios] = useState<Rateio[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
-  const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
-  const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
-
   // Supabase Data Fetching
-  
   
  useEffect(() => {
    // =============================================
@@ -730,32 +671,14 @@ export default function App() {
     )
     .subscribe();
 
-    // 7. SOLICITAÇÕES (COLE ESTE BLOCO INTEIRO)
-    const solChannel = supabase
-      .channel('realtime-solicitacoes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'solicitacoes' },
-        async () => {
-          const { data } = await supabase
-            .from('solicitacoes')
-            .select('*')
-            .order('id', { ascending: false });
-          if (data) setSolicitacoes(verificarAtrasados(data.map(mapSolicitacaoFromDb)));
-        }
-      )
-      .subscribe();
-
   // Cleanup - Remove todos os canais ao sair da página
   return () => {
-    supabase.removeChannel(solChannel);
     supabase.removeChannel(usersChannel);
     supabase.removeChannel(absChannel);
     supabase.removeChannel(eqChannel);
     supabase.removeChannel(budgetsChannel);
     supabase.removeChannel(raiteiosChannel);
     supabase.removeChannel(dieselChannel);
-    supabase.removeChannel(solChannel);
   };
 }, []);
   
@@ -778,13 +701,6 @@ export default function App() {
     } else if (uData && uData.length > 0) {
       setUsers(uData.map(mapUserFromDb));
     }
-
-    // Carregar Solicitações
-  const { data: solData } = await supabase
-    .from('solicitacoes')
-    .select('*')
-    .order('id', { ascending: false });
-  if (solData) setSolicitacoes(verificarAtrasados(solData.map(mapSolicitacaoFromDb)));
 
     // Carregar Abastecimentos
     const { data: absData } = await supabase
@@ -847,7 +763,14 @@ export default function App() {
 
   loadData();
 }, []);
-
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [rateios, setRateios] = useState<Rateio[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  // Adicione estes dois estados novos
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
+  const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
+  const [dieselPrice, setDieselPrice] = useState<DieselPrice>(initialDieselPrice);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -1253,74 +1176,6 @@ const handleResetPassword = async () => {
     setCurrentPage('login');
     addNotification('info', 'Você saiu do sistema');
   };
-
-  // ADD funções de CRUD
-  const handleAddSolicitacao = async (s: Omit<Solicitacao, 'id' | 'createdAt' | 'valorTotal' | 'createdBy'>) => {
-  const valorTotal = s.precoUnitario * s.quantidade;
-  const payload = {
-    numero_pedido: cleanText(s.numeroPedido),
-    preco_unitario: s.precoUnitario,
-    valor_total: valorTotal,
-    atendimento: cleanText(s.atendimento),
-    data_hora_solicitacao: s.dataHoraSolicitacao || new Date().toISOString(),
-    data_programada: s.dataProgramada || null,
-    quantidade: s.quantidade,
-    tipo_combustivel: cleanText(s.tipoCombustivel),
-    doc_fiscal: cleanText(s.docFiscal),
-    solicitante: cleanText(s.solicitante),
-    status: s.status,
-    situacao: s.situacao,
-    created_by: cleanText(currentUser?.name || 'Unknown'),
-    created_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase.from('solicitacoes').insert([payload]).select();
-  if (error) {
-    addNotification('error', `Erro ao salvar: ${error.message}`);
-    return;
-  }
-  if (data) {
-    setSolicitacoes(prev => [mapSolicitacaoFromDb(data[0]), ...prev]);
-    addNotification('success', 'Solicitação cadastrada com sucesso!');
-  }
-};
-
-const handleDeleteSolicitacao = async (id: number) => {
-  if (!window.confirm('Excluir esta solicitação?')) return;
-  const { error } = await supabase.from('solicitacoes').delete().eq('id', id);
-  if (error) {
-    addNotification('error', `Erro: ${error.message}`);
-    return;
-  }
-  setSolicitacoes(prev => prev.filter(s => s.id !== id));
-  addNotification('success', 'Solicitação excluída!');
-};
-
-const handleUpdateSolicitacao = async (s: Solicitacao) => {
-  const valorTotal = s.precoUnitario * s.quantidade;
-  const payload = {
-    numero_pedido: cleanText(s.numeroPedido),
-    preco_unitario: s.precoUnitario,
-    valor_total: valorTotal,
-    atendimento: cleanText(s.atendimento),
-    data_hora_solicitacao: s.dataHoraSolicitacao,
-    data_programada: s.dataProgramada || null,
-    quantidade: s.quantidade,
-    tipo_combustivel: cleanText(s.tipoCombustivel),
-    doc_fiscal: cleanText(s.docFiscal),
-    solicitante: cleanText(s.solicitante),
-    status: s.status,
-    situacao: s.situacao,
-  };
-  const { error } = await supabase.from('solicitacoes').update(payload).eq('id', s.id);
-  if (error) {
-    addNotification('error', `Erro: ${error.message}`);
-    return;
-  }
-  setSolicitacoes(prev => prev.map(item => item.id === s.id ? { ...s, valorTotal } : item));
-  setEditingSolicitacao(null);
-  addNotification('success', 'Solicitação atualizada!');
-};
 
   // Add equipment
   const handleAddEquipment = async (equipment: Omit<Equipment, 'id' | 'createdAt'>) => {
@@ -2512,158 +2367,6 @@ return {
     XLSX.writeFile(workbook, `${safeName}_${dateSuffix}.xlsx`);
     addNotification('success', 'Arquivo exportado com sucesso!');
   };
-
-  //SolicitacaoForm
-const SolicitacaoForm = ({ initialData, onSave, onCancel }: {
-  initialData?: Solicitacao | null;
-  onSave: (s: any) => void;
-  onCancel: () => void;
-}) => {
-  const [numeroPedido, setNumeroPedido] = useState(initialData?.numeroPedido || '');
-  const [precoUnitario, setPrecoUnitario] = useState(initialData?.precoUnitario.toString() || '');
-  const [quantidade, setQuantidade] = useState(initialData?.quantidade.toString() || '');
-  const [atendimento, setAtendimento] = useState(initialData?.atendimento || '');
-  const [dataHoraSolicitacao, setDataHoraSolicitacao] = useState(
-    initialData?.dataHoraSolicitacao ? initialData.dataHoraSolicitacao.slice(0, 16) : ''
-  );
-  const [dataProgramada, setDataProgramada] = useState(initialData?.dataProgramada || '');
-  const [tipoCombustivel, setTipoCombustivel] = useState(initialData?.tipoCombustivel || 'Diesel S10');
-  const [docFiscal, setDocFiscal] = useState(initialData?.docFiscal || '');
-  const [solicitante, setSolicitante] = useState(initialData?.solicitante || currentUser?.name || '');
-  const [status, setStatus] = useState<StatusSolicitacao>(initialData?.status || 'SOLICITADO');
-  const [situacao, setSituacao] = useState<SituacaoSolicitacao>(initialData?.situacao || 'LIBERADO');
-
-  const valorTotal = (parseFloat(precoUnitario) || 0) * (parseFloat(quantidade) || 0);
-
-  const handleSubmit = () => {
-    if (!numeroPedido || !precoUnitario || !quantidade) {
-      alert('Preencha pelo menos: Pedido, Preço Unitário e Quantidade');
-      return;
-    }
-    onSave({
-      numeroPedido,
-      precoUnitario: parseFloat(precoUnitario),
-      valorTotal,
-      atendimento,
-      dataHoraSolicitacao: dataHoraSolicitacao || new Date().toISOString(),
-      dataProgramada,
-      quantidade: parseFloat(quantidade),
-      tipoCombustivel,
-      docFiscal,
-      solicitante,
-      status,
-      situacao,
-    });
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
-      <div className="mb-5 flex items-center justify-between">
-        <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          {initialData ? <Pencil className="h-4 w-4 text-blue-600" /> : <Plus className="h-4 w-4 text-blue-600" />}
-          {initialData ? 'Editar Solicitação' : 'Nova Solicitação'}
-        </h4>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Nº Pedido BR *</label>
-          <input type="text" value={numeroPedido} onChange={e => setNumeroPedido(e.target.value)}
-            placeholder="Ex: 4500012345"
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Solicitante *</label>
-          <input type="text" value={solicitante} onChange={e => setSolicitante(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Combustível *</label>
-          <select value={tipoCombustivel} onChange={e => setTipoCombustivel(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
-            <option value="Diesel S10">Diesel S10</option>
-            <option value="Diesel S500">Diesel S500</option>
-            <option value="Gasolina">Gasolina</option>
-            <option value="Etanol">Etanol</option>
-            <option value="ARLA 32">ARLA 32</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Quantidade *</label>
-          <input type="number" step="0.01" value={quantidade} onChange={e => setQuantidade(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Preço Unitário (R$) *</label>
-          <input type="number" step="0.01" value={precoUnitario} onChange={e => setPrecoUnitario(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Valor Total</label>
-          <input type="text" value={formatCurrency(valorTotal)} disabled
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-600 font-semibold" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Data/Hora Solicitação</label>
-          <input type="datetime-local" value={dataHoraSolicitacao} onChange={e => setDataHoraSolicitacao(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Data Programada</label>
-          <input type="date" value={dataProgramada} onChange={e => setDataProgramada(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Atendimento</label>
-          <input type="text" value={atendimento} onChange={e => setAtendimento(e.target.value)}
-            placeholder="Ex: Filial SP, Usina..."
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">DOC Fiscal</label>
-          <input type="text" value={docFiscal} onChange={e => setDocFiscal(e.target.value)}
-            placeholder="Ex: NF 12345"
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-          <select value={status} onChange={e => setStatus(e.target.value as StatusSolicitacao)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
-            <option value="SOLICITADO">SOLICITADO</option>
-            <option value="RECEBIDO">RECEBIDO</option>
-            <option value="ATRASADO">ATRASADO</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Situação do Pedido</label>
-          <select value={situacao} onChange={e => setSituacao(e.target.value as SituacaoSolicitacao)}
-            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none">
-            <option value="LIBERADO">LIBERADO</option>
-            <option value="LIBERADO PARCIALMENTE">LIBERADO PARCIALMENTE</option>
-            <option value="BLOQUEADO">BLOQUEADO</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex gap-3 pt-5">
-        <button onClick={handleSubmit}
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center gap-2">
-          <Check className="w-4 h-4" />
-          {initialData ? 'Salvar alterações' : 'Cadastrar solicitação'}
-        </button>
-        <button onClick={onCancel}
-          className="px-6 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium rounded-lg">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
 
   // Render functions
   const renderLogin = () => (
@@ -6342,357 +6045,174 @@ const handleRemoveAvatar = async () => {
     </div>
   );
 
-  // solicitações
- const renderSolicitacoes = () => {
-    // Pega valores únicos para os dropdowns (só os cadastrados)
-    const numerosPedido = [...new Set(solicitacoes.map(s => s.numeroPedido).filter(Boolean))].sort();
-    const docFiscais = [...new Set(solicitacoes.map(s => s.docFiscal).filter(Boolean))].sort();
-    const mesesDisponiveis = [...new Set(solicitacoes.map(s => {
-      if (!s.dataHoraSolicitacao) return '';
-      const d = new Date(s.dataHoraSolicitacao);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }).filter(Boolean))].sort().reverse();
-
-    // Aplica os filtros
-    const solicitacoesFiltradas = solicitacoes.filter(s => {
-      if (filtroSolicNumero && s.numeroPedido !== filtroSolicNumero) return false;
-      if (filtroSolicDocFiscal && s.docFiscal !== filtroSolicDocFiscal) return false;
-      if (filtroSolicStatus && s.status !== filtroSolicStatus) return false;
-      if (filtroSolicSituacao && s.situacao !== filtroSolicSituacao) return false;
-      if (filtroSolicDataInicio && s.dataHoraSolicitacao) {
-        const dataS = s.dataHoraSolicitacao.split('T')[0];
-        if (dataS < filtroSolicDataInicio) return false;
-      }
-      if (filtroSolicDataFim && s.dataHoraSolicitacao) {
-        const dataS = s.dataHoraSolicitacao.split('T')[0];
-        if (dataS > filtroSolicDataFim) return false;
-      }
-      if (filtroSolicMes && s.dataHoraSolicitacao) {
-        const d = new Date(s.dataHoraSolicitacao);
-        const mesItem = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        if (mesItem !== filtroSolicMes) return false;
-      }
-      return true;
-    });
-
-    // KPIs - baseados no filtro de mês (se houver) ou geral
-    const baseKPI = filtroSolicMes
-      ? solicitacoes.filter(s => {
-          if (!s.dataHoraSolicitacao) return false;
-          const d = new Date(s.dataHoraSolicitacao);
-          const mesItem = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          return mesItem === filtroSolicMes;
-        })
-      : solicitacoes;
-
-    const totalSolicitado = baseKPI.reduce((sum, s) => sum + s.valorTotal, 0);
-    const totalRecebido = baseKPI
-      .filter(s => s.status === 'RECEBIDO')
-      .reduce((sum, s) => sum + s.valorTotal, 0);
-    const totalQuantidade = baseKPI.reduce((sum, s) => sum + s.quantidade, 0);
-
-    // Label do mês selecionado
-    const getMesLabel = (mes: string) => {
-      if (!mes) return '';
-      const [ano, m] = mes.split('-');
-      const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-      return `${meses[parseInt(m) - 1]} / ${ano}`;
-    };
-
-    const limparFiltros = () => {
-      setFiltroSolicNumero('');
-      setFiltroSolicDocFiscal('');
-      setFiltroSolicStatus('');
-      setFiltroSolicSituacao('');
-      setFiltroSolicDataInicio('');
-      setFiltroSolicDataFim('');
-      setFiltroSolicMes('');
-    };
-
-    const filtrosAtivos = [
-      filtroSolicNumero, filtroSolicDocFiscal, filtroSolicStatus,
-      filtroSolicSituacao, filtroSolicDataInicio, filtroSolicDataFim, filtroSolicMes
-    ].filter(Boolean).length;
+  const renderExport = () => {
+    const selectedFormat = EXPORT_FORMAT_OPTIONS.find((option) => option.id === exportFormat)!;
+    const isBaseFormat = exportFormat === 'base';
 
     return (
-      <div className="space-y-6">
-        {/* ========== CABEÇALHO + KPIs ========== */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto max-w-6xl space-y-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <FileOutput className="h-5 w-5" />
+            </div>
             <div>
-              <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                <FileInput className="w-5 h-5 text-red-800" />
-                Controle de Solicitações
-              </h3>
-              <p className="text-sm text-slate-500">
-                Pedidos de combustível com acompanhamento de status e situação
-                {filtroSolicMes && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                    📅 {getMesLabel(filtroSolicMes)}
-                  </span>
-                )}
+              <h3 className="text-lg font-semibold text-slate-800">Exportação de Dados</h3>
+              <p className="text-sm text-slate-500">Gere arquivos .xlsx prontos para Excel com filtros e formatos personalizados</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px,1fr]">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <FileOutput className="h-4 w-4 text-blue-600" />
+                Formato de Exportação
+              </h4>
+              <div className="space-y-2">
+                {EXPORT_FORMAT_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setExportFormat(option.id)}
+                    className={cn(
+                      'w-full rounded-lg border px-4 py-3 text-left transition',
+                      exportFormat === option.id
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-slate-200 bg-white hover:bg-slate-50',
+                    )}
+                  >
+                    <p className="text-sm font-medium text-slate-800">{option.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{option.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-3 text-sm font-semibold text-slate-700">Nome do Arquivo</h4>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={exportFileName}
+                  onChange={(e) => setExportFileName(cleanText(e.target.value))}
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+                />
+                <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">.xlsx</span>
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Será salvo como: {cleanText(exportFileName || 'controle_abastecimento')}_{new Date().toISOString().slice(0, 10)}.xlsx
               </p>
             </div>
+          </div>
+
+          <div className="space-y-4">
+           
+            {isBaseFormat && (
+              <details className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-slate-700">
+                  <span className="flex items-center gap-2">
+                    <Database className="h-4 w-4 text-slate-500" />
+                    Selecionar Colunas para Exportar
+                  </span>
+                  <span className="text-xs text-slate-400">{selectedBaseColumns.length}/{BASE_EXPORT_COLUMNS.length} selecionadas</span>
+                </summary>
+                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
+                  {BASE_EXPORT_COLUMNS.map((column) => (
+                    <label key={column.key} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedBaseColumns.includes(column.key)}
+                        onChange={() => toggleBaseExportColumn(column.key)}
+                        className="h-4 w-4 rounded border-slate-300 text-red-800 focus:ring-red-800/30"
+                      />
+                      <span>{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h4 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <FileOutput className="h-4 w-4 text-emerald-600" />
+                Resumo da Exportação
+              </h4>
+
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-xl bg-blue-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">{exportPreview.records}</p>
+                  <p className="text-xs text-blue-500">Registros</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-emerald-700">{formatNumber(exportPreview.litros, 0)}</p>
+                  <p className="text-xs text-emerald-500">Litros</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-700">{formatCurrency(exportPreview.valor)}</p>
+                  <p className="text-xs text-amber-500">Valor Total</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-700">{exportPreview.columns.length}</p>
+                  <p className="text-xs text-slate-500">Colunas</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Colunas na planilha</p>
+                <div className="flex flex-wrap gap-2">
+                  {exportPreview.columns.map((column) => (
+                    <span key={column} className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600">
+                      {column}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Abas que serão criadas no XLSX</p>
+                <div className="flex flex-wrap gap-2">
+                  {exportPreview.sheetNames.map((sheet) => (
+                    <span
+                      key={sheet}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-[11px] font-medium',
+                        sheet === selectedFormat.sheetName ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600',
+                      )}
+                    >
+                      {sheet}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <button
-              onClick={() => { setEditingSolicitacao(null); setShowSolicitacaoForm(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg"
+              onClick={handleExportExcelFile}
+              disabled={exportPreview.rows.length === 0 || exportPreview.columns.length === 0}
+              className={cn(
+                'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm font-medium transition',
+                exportPreview.rows.length === 0 || exportPreview.columns.length === 0
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+                  : 'bg-blue-600 text-white hover:bg-blue-700',
+              )}
             >
-              <Plus className="w-4 h-4" />
-              Nova Solicitação
+              <Download className="h-5 w-5" />
+              Exportar para Excel (.xlsx)
             </button>
-          </div>
 
-          {/* 4 KPIs */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl bg-blue-50 p-4">
-              <p className="text-sm text-blue-600 mb-1">Total Solicitado</p>
-              <p className="text-2xl font-bold text-blue-800">{formatCurrency(totalSolicitado)}</p>
-            </div>
-            <div className="rounded-xl bg-green-50 p-4">
-              <p className="text-sm text-green-600 mb-1">Total Recebido</p>
-              <p className="text-2xl font-bold text-green-800">{formatCurrency(totalRecebido)}</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 p-4">
-              <p className="text-sm text-amber-600 mb-1">QTD. Total</p>
-              <p className="text-2xl font-bold text-amber-800">{formatNumber(totalQuantidade, 2)} L</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-600 mb-1">Total de Pedidos</p>
-              <p className="text-2xl font-bold text-slate-800">{baseKPI.length}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== FILTROS ========== */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Filter className="h-4 w-4 text-red-800" />
-              Filtros
-              <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                {filtrosAtivos} ativo{filtrosAtivos !== 1 ? 's' : ''}
-              </span>
-            </h4>
-            <button
-              onClick={limparFiltros}
-              disabled={filtrosAtivos === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <X className="h-4 w-4" />
-              Limpar filtros
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Pedido BR */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Pedido BR</label>
-              <select
-                value={filtroSolicNumero}
-                onChange={(e) => setFiltroSolicNumero(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              >
-                <option value="">Todos os pedidos</option>
-                {numerosPedido.map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* DOC Fiscal */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">DOC Fiscal</label>
-              <select
-                value={filtroSolicDocFiscal}
-                onChange={(e) => setFiltroSolicDocFiscal(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              >
-                <option value="">Todos os documentos</option>
-                {docFiscais.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Status</label>
-              <select
-                value={filtroSolicStatus}
-                onChange={(e) => setFiltroSolicStatus(e.target.value as StatusSolicitacao)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              >
-                <option value="">Todos os status</option>
-                <option value="SOLICITADO">SOLICITADO</option>
-                <option value="RECEBIDO">RECEBIDO</option>
-                <option value="ATRASADO">ATRASADO</option>
-              </select>
-            </div>
-
-            {/* Situação */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Situação</label>
-              <select
-                value={filtroSolicSituacao}
-                onChange={(e) => setFiltroSolicSituacao(e.target.value as SituacaoSolicitacao)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              >
-                <option value="">Todas as situações</option>
-                <option value="LIBERADO">LIBERADO</option>
-                <option value="LIBERADO PARCIALMENTE">LIBERADO PARCIALMENTE</option>
-                <option value="BLOQUEADO">BLOQUEADO</option>
-              </select>
-            </div>
-
-            {/* Mês */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Mês</label>
-              <select
-                value={filtroSolicMes}
-                onChange={(e) => setFiltroSolicMes(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              >
-                <option value="">Todos os meses</option>
-                {mesesDisponiveis.map(m => (
-                  <option key={m} value={m}>{getMesLabel(m)}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Data Início */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Data Início</label>
-              <input
-                type="date"
-                value={filtroSolicDataInicio}
-                onChange={(e) => setFiltroSolicDataInicio(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              />
-            </div>
-
-            {/* Data Fim */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Data Fim</label>
-              <input
-                type="date"
-                value={filtroSolicDataFim}
-                onChange={(e) => setFiltroSolicDataFim(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ========== FORMULÁRIO (quando aberto) ========== */}
-        {showSolicitacaoForm && (
-          <SolicitacaoForm
-            initialData={editingSolicitacao}
-            onSave={async (s) => {
-              if (editingSolicitacao) {
-                await handleUpdateSolicitacao({ ...editingSolicitacao, ...s });
-              } else {
-                await handleAddSolicitacao(s as any);
-              }
-              setShowSolicitacaoForm(false);
-              setEditingSolicitacao(null);
-            }}
-            onCancel={() => { setShowSolicitacaoForm(false); setEditingSolicitacao(null); }}
-          />
-        )}
-
-        {/* ========== TABELA ========== */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs text-slate-600">
-              Mostrando <strong>{solicitacoesFiltradas.length}</strong> de <strong>{solicitacoes.length}</strong> solicitações
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[1200px] w-full">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Pedido BR</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Solicitante</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Combustível</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Qtd.</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Preço Un.</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Valor Total</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Solicitação</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Data Programada</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Atendimento</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">DOC Fiscal</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Situação</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {solicitacoesFiltradas.length > 0 ? (
-                  solicitacoesFiltradas.map(s => (
-                    <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 text-sm font-medium text-red-800">{s.numeroPedido}</td>
-                      <td className="py-3 px-4 text-sm text-slate-700">{s.solicitante}</td>
-                      <td className="py-3 px-4 text-sm text-slate-700">{s.tipoCombustivel}</td>
-                      <td className="py-3 px-4 text-sm text-right text-slate-700">{formatNumber(s.quantidade, 2)}</td>
-                      <td className="py-3 px-4 text-sm text-right text-slate-700">{formatCurrency(s.precoUnitario)}</td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold text-slate-900">{formatCurrency(s.valorTotal)}</td>
-                      <td className="py-3 px-4 text-sm text-slate-600">
-                        {s.dataHoraSolicitacao ? new Date(s.dataHoraSolicitacao).toLocaleString('pt-BR') : '-'}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-slate-600">{s.dataProgramada || '-'}</td>
-                      <td className="py-3 px-4 text-sm text-slate-600">{s.atendimento || '-'}</td>
-                      <td className="py-3 px-4 text-sm text-slate-600">{s.docFiscal || '-'}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          s.status === 'RECEBIDO' ? 'bg-green-100 text-green-800' :
-                          s.status === 'ATRASADO' ? 'bg-red-100 text-red-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          s.situacao === 'LIBERADO' ? 'bg-green-100 text-green-800' :
-                          s.situacao === 'LIBERADO PARCIALMENTE' ? 'bg-amber-100 text-amber-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {s.situacao}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => { setEditingSolicitacao(s); setShowSolicitacaoForm(true); }}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSolicitacao(s.id)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={13} className="py-12 text-center text-slate-400">
-                      Nenhuma solicitação encontrada com os filtros aplicados
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            {exportPreview.rows.length === 0 && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <AlertCircle className="h-4 w-4" />
+                Nenhum dado encontrado com os filtros aplicados.
+              </div>
+            )}
           </div>
         </div>
       </div>
     );
   };
+
   // Main render
   if (!currentUser) {
     return (
@@ -6724,7 +6244,6 @@ const handleRemoveAvatar = async () => {
   }
 
   const navItems = [
-    { id: 'solicitacoes', label: 'Solicitações', icon: FileInput },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'database', label: 'Base de Dados', icon: Database },
     { id: 'budget', label: 'Orçamento', icon: Wallet },
@@ -6775,7 +6294,7 @@ const handleRemoveAvatar = async () => {
                 {navItems
                   .filter(item => {
                     if (currentUser?.role === 'admin') return true;
-                    if (currentUser?.role === 'supervisor') return ['dashboard','database', 'budget','equipments', 'history','preenchimento','import', 'export', 'diesel','solicitacoes'].includes(item.id);
+                    if (currentUser?.role === 'supervisor') return ['dashboard','database', 'budget','equipments', 'history','preenchimento','import', 'export', 'diesel'].includes(item.id);
                     return item.id === 'preenchimento';
                   })
                   .map(item => {
@@ -6897,7 +6416,6 @@ const handleRemoveAvatar = async () => {
                    currentPage === 'equipments' ? 'Equipamentos' :
                    currentPage === 'history' ? 'Histórico' :
                    currentPage === 'preenchimento' ? 'Preenchimento' :
-                   currentPage === 'solicitacoes' ? 'Solicitações' :
                    currentPage === 'import' ? 'Importação' :
                    currentPage === 'export' ? 'Exportação' :
                    currentPage === 'users' ? 'Usuários' : 'Sistema'}
@@ -6916,7 +6434,6 @@ const handleRemoveAvatar = async () => {
         </div>
 
         <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 sm:p-4 lg:p-6">
-          {currentPage === 'solicitacoes' && renderSolicitacoes()}
           {currentPage === 'dashboard' && renderDashboard()}
           {currentPage === 'database' && renderDatabase()}
           {currentPage === 'budget' && renderBudget()}
@@ -6964,5 +6481,4 @@ const handleRemoveAvatar = async () => {
       </div>
     </div>
   );
-};
-
+}
