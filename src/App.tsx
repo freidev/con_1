@@ -2259,87 +2259,90 @@ return {
   addNotification('success', 'Registro excluído com sucesso!');
 };
 
-  const handleSaveEditRecord = async (updated: Abastecimento) => {
-  const oldRecord = abastecimentos.find(a => a.id === updated.id);
-  const newValor = updated.litros * dieselPrice.price;
+   // ✅ ATUALIZADO: Agora suporta e grava o preço do diesel editado no histórico
+  const handleSaveEditRecord = async (updated: Abastecimento & { precoDiesel?: number }) => {
+    const oldRecord = abastecimentos.find(a => a.id === updated.id);
+    
+    // Se o usuário digitou um preço no modal, usa ele. Se não, tenta calcular o preço histórico ou usa o atual global
+    const precoUtilizado = updated.precoDiesel ?? (updated.litros > 0 ? (updated.valor / updated.litros) : dieselPrice.price);
+    const newValor = updated.litros * precoUtilizado;
 
-  const payload = {
-    litros: updated.litros,
-    valor: newValor,
-    cc_novo: cleanText(updated.ccNovo),
-    diretoria: cleanText(updated.diretoria),
-    gerencia: cleanText(updated.gerencia),
-    area_lotacao: cleanText(updated.areaLotacao),
-    fornecedor: cleanText(updated.fornecedor),
-    equipamento: cleanText(updated.equipamento),
-    area: cleanText(updated.area),
-    semana: cleanText(updated.semana) || deriveWeekLabel(updated.data),
-    data: normalizeDateValue(updated.data),
-    observacoes: cleanText(updated.observacoes || ''),
-    rateio_info: updated.rateioInfo || null,
-  };
+    const payload = {
+      litros: updated.litros,
+      valor: newValor,
+      cc_novo: cleanText(updated.ccNovo),
+      diretoria: cleanText(updated.diretoria),
+      gerencia: cleanText(updated.gerencia),
+      area_lotacao: cleanText(updated.areaLotacao),
+      fornecedor: cleanText(updated.fornecedor),
+      equipamento: cleanText(updated.equipamento),
+      area: cleanText(updated.area),
+      semana: cleanText(updated.semana) || deriveWeekLabel(updated.data),
+      data: normalizeDateValue(updated.data),
+      observacoes: cleanText(updated.observacoes || ''),
+      rateio_info: updated.rateioInfo || null,
+    };
 
-  // Atualiza no banco
-  const { error } = await supabase
-    .from('abastecimentos')
-    .update(payload)
-    .eq('id', updated.id);
+    // Atualiza no banco
+    const { error } = await supabase
+      .from('abastecimentos')
+      .update(payload)
+      .eq('id', updated.id);
 
-  if (error) {
-    console.error('ERRO ao editar registro:', error);
-    addNotification('error', `Erro ao atualizar: ${error.message}`);
-    return;
-  }
-
-  // Atualiza estado local
-  const saved: Abastecimento = {
-    ...updated,
-    valor: newValor,
-    semana: updated.semana || deriveWeekLabel(updated.data),
-  };
-
-  setAbastecimentos(prev => prev.map(a => a.id === saved.id ? saved : a));
-
-  // Ajusta orçamento no banco e no estado local
-  if (oldRecord) {
-    const budgetsParaAtualizar = budgets.filter(b =>
-      b.diretoria === oldRecord.diretoria ||
-      b.diretoria === saved.diretoria
-    );
-
-    for (const b of budgetsParaAtualizar) {
-      let novoRealizado = b.realizado;
-
-      if (b.diretoria === oldRecord.diretoria) {
-        novoRealizado = Math.max(0, novoRealizado - oldRecord.valor);
-      }
-      if (b.diretoria === saved.diretoria) {
-        novoRealizado += newValor;
-      }
-
-      await supabase
-        .from('budgets')
-        .update({ realizado: novoRealizado })
-        .eq('id', b.id);
+    if (error) {
+      console.error('ERRO ao editar registro:', error);
+      addNotification('error', `Erro ao atualizar: ${error.message}`);
+      return;
     }
 
-    // Atualiza estado local dos budgets
-    setBudgets(prev => prev.map(b => {
-      let realizado = b.realizado;
-      if (b.diretoria === oldRecord.diretoria) {
-        realizado = Math.max(0, realizado - oldRecord.valor);
-      }
-      if (b.diretoria === saved.diretoria) {
-        realizado += newValor;
-      }
-      return { ...b, realizado };
-    }));
-  }
+    // Atualiza estado local
+    const saved: Abastecimento = {
+      ...updated,
+      valor: newValor,
+      semana: updated.semana || deriveWeekLabel(updated.data),
+    };
 
-  setEditingRecord(null);
-  addNotification('success', 'Registro atualizado com sucesso!');
-};
+    setAbastecimentos(prev => prev.map(a => a.id === saved.id ? saved : a));
 
+    // Ajusta orçamento no banco e no estado local
+    if (oldRecord) {
+      const budgetsParaAtualizar = budgets.filter(b =>
+        b.diretoria === oldRecord.diretoria ||
+        b.diretoria === saved.diretoria
+      );
+
+      for (const b of budgetsParaAtualizar) {
+        let novoRealizado = b.realizado;
+
+        if (b.diretoria === oldRecord.diretoria) {
+          novoRealizado = Math.max(0, novoRealizado - oldRecord.valor);
+        }
+        if (b.diretoria === saved.diretoria) {
+          novoRealizado += newValor;
+        }
+
+        await supabase
+          .from('budgets')
+          .update({ realizado: novoRealizado })
+          .eq('id', b.id);
+      }
+
+      // Atualiza estado local dos budgets
+      setBudgets(prev => prev.map(b => {
+        let realizado = b.realizado;
+        if (b.diretoria === oldRecord.diretoria) {
+          realizado = Math.max(0, realizado - oldRecord.valor);
+        }
+        if (b.diretoria === saved.diretoria) {
+          realizado += newValor;
+        }
+        return { ...b, realizado };
+      }));
+    }
+
+    setEditingRecord(null);
+    addNotification('success', 'Registro atualizado com sucesso!');
+  };
   const handleExportExcelFile = () => {
     if (exportPreview.rows.length === 0) {
       addNotification('warning', 'Nenhum dado encontrado com os filtros aplicados.');
@@ -3406,8 +3409,15 @@ return {
                       <td className="py-3 px-4 text-sm text-slate-800 font-medium">{formatCurrency(a.valor)}</td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditingRecord({ ...a })}
+                           <button
+                            onClick={() => {
+                              // Calcula automaticamente o preço que havia sido cobrado nesse registro
+                              const precoOriginal = a.litros > 0 ? (a.valor / a.litros) : dieselPrice.price;
+                              setEditingRecord({ 
+                                ...a, 
+                                precoDiesel: Number(precoOriginal.toFixed(4)) // Grava temporariamente o preço original
+                              } as any);
+                            }}
                             className="text-slate-400 hover:text-blue-600 transition"
                             title="Editar registro"
                           >
@@ -3506,17 +3516,30 @@ return {
                           onChange={e => setEditingRecord({ ...editingRecord, data: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
-                      <div>
+                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Litros</label>
                         <input type="number" step="0.01" value={editingRecord.litros}
                           onChange={e => setEditingRecord({ ...editingRecord, litros: parseFloat(e.target.value) || 0 })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
-                      <div className="col-span-2 bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
-                        Valor calculado: <span className="font-semibold text-slate-800">{formatCurrency((editingRecord.litros || 0) * dieselPrice.price)}</span>
-                        <span className="text-xs text-slate-400 ml-2">(Litros × {formatCurrency(dieselPrice.price)}/L)</span>
+
+                      {/* 👈 NOVO CAMPO: Preço do diesel editável no modal do histórico */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Preço do Diesel (R$/L)</label>
+                        <input type="number" step="0.01" value={(editingRecord as any).precoDiesel ?? ''}
+                          onChange={e => setEditingRecord({ ...editingRecord, precoDiesel: parseFloat(e.target.value) || 0 } as any)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
-                    </div>
+
+                      {/* Preview do Valor recalculando em tempo real conforme as alterações */}
+                      <div className="col-span-2 bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
+                        Valor calculado: <span className="font-semibold text-slate-800">
+                          {formatCurrency((editingRecord.litros || 0) * ((editingRecord as any).precoDiesel || dieselPrice.price))}
+                        </span>
+                        <span className="text-xs text-slate-400 ml-2">
+                          (Litros × {formatCurrency((editingRecord as any).precoDiesel || dieselPrice.price)}/L)
+                        </span>
+                      </div>
                     <div className="border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
                       <button
                         onClick={() => setEditingRecord(null)}
