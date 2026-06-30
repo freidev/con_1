@@ -3596,7 +3596,7 @@ return {
                 </div>
               </div>
 
-              {filteredEquipments.length > 0 ? (
+                 {filteredEquipments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-[900px] w-full">
                     <thead>
@@ -3676,85 +3676,8 @@ return {
     );
   };
 
-              {filteredEquipments.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-[900px] w-full">
-                    <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">ID</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Equipamento</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Placa</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">CC Novo</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Gerência</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Área Lot.</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Área</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Fornecedor</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Cadastrado em</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredEquipments.map((eq) => (
-                        <tr key={eq.id} className="border-b border-slate-100 hover:bg-slate-50">
-                          <td className="py-3 px-4 text-sm text-red-800 font-medium">{eq.id}</td>
-                          <td className="py-3 px-4 text-sm text-slate-800 font-medium">{eq.equipment}</td>
-                          <td className="py-3 px-4 text-sm text-slate-600">{eq.plate || '-'}</td>
-                          <td className="py-3 px-4 text-sm text-slate-600">
-                            <div className="flex flex-wrap gap-1">
-                              {eq.ccNovo.length > 0 ? (
-                                eq.ccNovo.map((cc) => (
-                                  <span key={cc} className="rounded bg-slate-100 px-2 py-0.5 text-xs">
-                                    {cc}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-slate-400">-</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-sm text-slate-600">{eq.gerencia}</td>
-                          <td className="py-3 px-4 text-sm text-slate-600">{eq.areaLotacao}</td>
-                          <td className="py-3 px-4 text-sm text-slate-600">{eq.area}</td>
-                          <td className="py-3 px-4 text-sm text-slate-600">{eq.fornecedor}</td>
-                          <td className="py-3 px-4 text-sm text-slate-500">
-                            {new Date(eq.createdAt).toLocaleDateString('pt-BR')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-12 text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
-                    <Wrench className="h-8 w-8 text-slate-400" />
-                  </div>
-                  <p className="text-slate-600 font-medium mb-1">
-                    {equipments.length === 0
-                      ? 'Nenhum equipamento cadastrado'
-                      : 'Nenhum equipamento encontrado com a busca'}
-                  </p>
-                  <p className="text-sm text-slate-400 mb-4">
-                    {equipments.length === 0
-                      ? 'Cadastre um novo equipamento na aba Equipamentos'
-                      : 'Tente ajustar o termo da busca'}
-                  </p>
-                  {equipments.length === 0 && (
-                    <button
-                      onClick={() => setCurrentPage('equipments')}
-                      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg inline-flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Novo Equipamento
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+
+  
 
   const renderBudget = () => {
     const budgetFilteredAbastecimentos = filteredAbastecimentos.filter((a) => {
