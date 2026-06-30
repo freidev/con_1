@@ -1409,57 +1409,59 @@ const handleDeleteBudget = async (budgetId: number) => {
   addNotification('success', 'Orçamento excluído com sucesso!');
 };
 
-  // Add abastecimento
-   const handleAddAbastecimento = async (
-  abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'>
-) => {
-  const valor = abastecimento.litros * dieselPrice.price;
+   // ✅ ATUALIZADO: Agora aceita o preço do diesel digitado na tela de preenchimento para calcular o valor correto
+  const handleAddAbastecimento = async (
+    abastecimento: Omit<Abastecimento, 'id' | 'createdAt' | 'valor' | 'createdBy'> & { precoDiesel?: number }
+  ) => {
+    // Se vier um preço digitado na tela, usa ele; senão, usa o preço global padrão do dia
+    const precoParaCalculo = abastecimento.precoDiesel ?? dieselPrice.price;
+    const valor = abastecimento.litros * precoParaCalculo;
 
-  const payload = {
-    litros: abastecimento.litros,
-    cc_novo: cleanText(abastecimento.ccNovo),
-    diretoria: cleanText(abastecimento.diretoria),
-    gerencia: cleanText(abastecimento.gerencia),
-    area_lotacao: cleanText(abastecimento.areaLotacao),
-    fornecedor: cleanText(abastecimento.fornecedor),
-    equipamento: cleanText(abastecimento.equipamento),
-    area: cleanText(abastecimento.area),
-    semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
-    data: normalizeDateValue(abastecimento.data),
-    observacoes: cleanText(abastecimento.observacoes || ''),
-    rateio_info: abastecimento.rateioInfo || null,
-    valor,
-    created_by: cleanText(currentUser?.name || 'Unknown'),
-    created_at: new Date().toISOString(),
-  };
+    const payload = {
+      litros: abastecimento.litros,
+      cc_novo: cleanText(abastecimento.ccNovo),
+      diretoria: cleanText(abastecimento.diretoria),
+      gerencia: cleanText(abastecimento.gerencia),
+      area_lotacao: cleanText(abastecimento.areaLotacao),
+      fornecedor: cleanText(abastecimento.fornecedor),
+      equipamento: cleanText(abastecimento.equipamento),
+      area: cleanText(abastecimento.area),
+      semana: cleanText(abastecimento.semana) || deriveWeekLabel(abastecimento.data),
+      data: normalizeDateValue(abastecimento.data),
+      observacoes: cleanText(abastecimento.observacoes || ''),
+      rateio_info: abastecimento.rateioInfo || null,
+      valor, // Grava no banco o valor calculado correto com o preço personalizado
+      created_by: cleanText(currentUser?.name || 'Unknown'),
+      created_at: new Date().toISOString(),
+    };
 
-  const { data, error } = await supabase
-    .from('abastecimentos')
-    .insert([payload])
-    .select();
+    const { data, error } = await supabase
+      .from('abastecimentos')
+      .insert([payload])
+      .select();
 
-  if (error) {
-    console.error('ERRO SUPABASE abastecimento:', error);
-    addNotification('error', `Erro ao salvar: ${error.message}`);
-    return;
-  }
-
-  if (data) {
-    const localRecord = mapAbastecimentoFromDb(data[0]);
-    setAbastecimentos((prev) => [localRecord, ...prev]);
-
-    if (localRecord.diretoria) {
-      setBudgets((prev) =>
-        prev.map((b) =>
-          b.diretoria === localRecord.diretoria
-            ? { ...b, realizado: b.realizado + valor }
-            : b
-        )
-      );
+    if (error) {
+      console.error('ERRO SUPABASE abastecimento:', error);
+      addNotification('error', `Erro ao salvar: ${error.message}`);
+      return;
     }
-    addNotification('success', 'Abastecimento salvo com sucesso!');
-  }
-};
+
+    if (data) {
+      const localRecord = mapAbastecimentoFromDb(data[0]);
+      setAbastecimentos((prev) => [localRecord, ...prev]);
+
+      if (localRecord.diretoria) {
+        setBudgets((prev) =>
+          prev.map((b) =>
+            b.diretoria === localRecord.diretoria
+              ? { ...b, realizado: b.realizado + valor }
+              : b
+          )
+        );
+      }
+      addNotification('success', 'Abastecimento salvo com sucesso!');
+    }
+  };
   // Update diesel price
   const handleUpdateDieselPrice = async () => {
   const price = parseFloat(newDieselPrice);
@@ -5026,6 +5028,7 @@ onAdd={async (r: any) => {
     </div>
   );
 
+ // ✅ ATUALIZADO: Passa as informações do preço global do diesel para dentro do formulário
   const renderPreenchimento = () => (
     <div className="w-full max-w-3xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
@@ -5034,23 +5037,35 @@ onAdd={async (r: any) => {
             <Plus className="w-5 h-5 text-red-800" />
             Preenchimento de Abastecimento
           </h3>
-<p className="text-sm text-slate-500">
-  Próximo ID: {abastecimentos.length > 0
-    ? Math.max(...abastecimentos.map(a => a.id)) + 1
-    : 1}
-</p>
+          <p className="text-sm text-slate-500">
+            Próximo ID: {abastecimentos.length > 0
+              ? Math.max(...abastecimentos.map(a => a.id)) + 1
+              : 1}
+          </p>
         </div>
 
         <PreenchimentoForm 
           equipments={equipments} 
           rateios={rateios}
+          dieselPrice={dieselPrice} // 👈 Passando o valor padrão global do diesel
           onAdd={handleAddAbastecimento} 
         />
       </div>
     </div>
   );
 
-  const PreenchimentoForm = ({ equipments, rateios, onAdd }: { equipments: Equipment[], rateios: Rateio[], onAdd: (a: any) => void }) => {
+   // ✅ ATUALIZADO COMPLETO: Agora com a nova caixa de texto para o Preço do Diesel do Dia
+  const PreenchimentoForm = ({ 
+    equipments, 
+    rateios, 
+    dieselPrice, // 👈 Agora recebe o preço padrão
+    onAdd 
+  }: { 
+    equipments: Equipment[], 
+    rateios: Rateio[], 
+    dieselPrice: DieselPrice, // 👈 Adicionado o tipo aqui
+    onAdd: (a: any) => void 
+  }) => {
     const [plate, setPlate] = useState('');
     const [equipment, setEquipment] = useState('');
     const [ccNovo, setCcNovo] = useState('');
@@ -5061,8 +5076,16 @@ onAdd={async (r: any) => {
     const [area, setArea] = useState('');
     const [data, setData] = useState(new Date().toISOString().split('T')[0]);
     const [litros, setLitros] = useState('');
+    const [precoDiesel, setPrecoDiesel] = useState(''); // 👈 Novo estado para o preço personalizado
     const [observacoes, setObservacoes] = useState('');
     const [selectedRateio, setSelectedRateio] = useState<string>('');
+
+    // Preenche o preço do diesel automaticamente com o valor global padrão do sistema
+    useEffect(() => {
+      if (dieselPrice?.price) {
+        setPrecoDiesel(dieselPrice.price.toString());
+      }
+    }, [dieselPrice]);
 
     const preenchimentoOptions = useMemo(() => ({
       placas: sortTextValues(equipments.map((item) => item.plate).filter(Boolean)),
@@ -5145,7 +5168,7 @@ onAdd={async (r: any) => {
     };
 
     const handleSubmit = () => {
-      if (!equipment || !ccNovo || !gerencia || !areaLotacao || !fornecedor || !area || !data || !litros) return;
+      if (!equipment || !ccNovo || !gerencia || !areaLotacao || !fornecedor || !area || !data || !litros || !precoDiesel) return;
       
       const rateioInfo = selectedRateio ? (() => {
         const rateio = rateios.find(r => r.id.toString() === selectedRateio);
@@ -5170,6 +5193,7 @@ onAdd={async (r: any) => {
         semana: `Sem ${Math.ceil(new Date(data).getDate() / 7)}`,
         data,
         litros: parseFloat(litros) || 0,
+        precoDiesel: parseFloat(precoDiesel) || dieselPrice.price, // 👈 Enviando o preço do diesel digitado
         observacoes,
         rateioInfo
       });
@@ -5184,6 +5208,7 @@ onAdd={async (r: any) => {
       setArea('');
       setData(new Date().toISOString().split('T')[0]);
       setLitros('');
+      setPrecoDiesel(dieselPrice.price.toString()); // 👈 Reseta para o valor padrão do sistema
       setObservacoes('');
       setSelectedRateio('');
     };
@@ -5322,6 +5347,20 @@ onAdd={async (r: any) => {
               className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
             />
           </div>
+          
+          {/* 👈 NOVO CAMPO: Adicionado o campo do Preço do Diesel dinâmico do lado do campo Litros */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Preço do Diesel (R$/L) *</label>
+            <input
+              type="number"
+              value={precoDiesel}
+              onChange={(e) => setPrecoDiesel(e.target.value)}
+              placeholder="Ex: 6.65"
+              step="0.01"
+              className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none"
+            />
+          </div>
+
           {rateios.length > 0 && (
             <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Rateio (Opcional)</label>
@@ -5359,7 +5398,6 @@ onAdd={async (r: any) => {
       </div>
     );
   };
-
   const renderImport = () => (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
