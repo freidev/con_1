@@ -2795,7 +2795,6 @@ return {
               <Fuel className="w-5 h-5 text-red-600" />
             </div>
           </div>
-        </div>
 
         
       {/* Charts Row 1 */}
