@@ -3244,7 +3244,7 @@ return {
     </div>
   );
 
-  const renderDatabase = () => {
+   const renderDatabase = () => {
     const filteredEquipments = equipments.filter((eq) => {
       if (!equipmentSearch) return true;
       const search = equipmentSearch.toLowerCase();
@@ -3258,6 +3258,15 @@ return {
         eq.ccNovo.some((cc) => cc.toLowerCase().includes(search))
       );
     });
+
+    // ✅ Cálculos feitos fora do JSX para evitar conflito de chaves e barras no compilador
+    const editingRecordPreco = editingRecord 
+      ? ((editingRecord as any).precoDiesel ?? (editingRecord.litros > 0 ? (editingRecord.valor / editingRecord.litros) : dieselPrice.price))
+      : dieselPrice.price;
+
+    const editingRecordValorCalculado = editingRecord 
+      ? (editingRecord.litros || 0) * editingRecordPreco 
+      : 0;
 
     return (
       <div className="space-y-6">
@@ -3405,34 +3414,33 @@ return {
                           <td className="py-3 px-4 text-sm text-slate-600">{a.area}</td>
                           <td className="py-3 px-4 text-sm text-slate-600">{a.semana}</td>
                           <td className="py-3 px-4 text-sm text-slate-600">{a.data}</td>
-                      <td className="py-3 px-4 text-sm text-slate-800 font-medium">{formatNumber(a.litros, 2)}</td>
-                      <td className="py-3 px-4 text-sm text-slate-800 font-medium">{formatCurrency(a.valor)}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                           <button
-                            onClick={() => {
-                              // Calcula automaticamente o preço que havia sido cobrado nesse registro
-                              const precoOriginal = a.litros > 0 ? (a.valor / a.litros) : dieselPrice.price;
-                              setEditingRecord({ 
-                                ...a, 
-                                precoDiesel: Number(precoOriginal.toFixed(4)) // Grava temporariamente o preço original
-                              } as any);
-                            }}
-                            className="text-slate-400 hover:text-blue-600 transition"
-                            title="Editar registro"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRecord(a.id)}
-                            className="text-slate-400 hover:text-red-600 transition"
-                            title="Excluir registro"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                          <td className="py-3 px-4 text-sm text-slate-800 font-medium">{formatNumber(a.litros, 2)}</td>
+                          <td className="py-3 px-4 text-sm text-slate-800 font-medium">{formatCurrency(a.valor)}</td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const precoOriginal = a.litros > 0 ? (a.valor / a.litros) : dieselPrice.price;
+                                  setEditingRecord({ 
+                                    ...a, 
+                                    precoDiesel: Number(precoOriginal.toFixed(4))
+                                  } as any);
+                                }}
+                                className="text-slate-400 hover:text-blue-600 transition"
+                                title="Editar registro"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRecord(a.id)}
+                                className="text-slate-400 hover:text-red-600 transition"
+                                title="Excluir registro"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       ))
                     ) : (
                       <tr>
@@ -3516,30 +3524,26 @@ return {
                           onChange={e => setEditingRecord({ ...editingRecord, data: e.target.value })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
-                       <div>
+                      <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Litros</label>
                         <input type="number" step="0.01" value={editingRecord.litros}
                           onChange={e => setEditingRecord({ ...editingRecord, litros: parseFloat(e.target.value) || 0 })}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
-
-                      {/* 👈 NOVO CAMPO: Preço do diesel editável no modal do histórico */}
+                      
+                      {/* Novo Campo: Preço do Diesel */}
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Preço do Diesel (R$/L)</label>
-                        <input type="number" step="0.01" value={(editingRecord as any).precoDiesel ?? ''}
+                        <input type="number" step="0.01" value={editingRecordPreco}
                           onChange={e => setEditingRecord({ ...editingRecord, precoDiesel: parseFloat(e.target.value) || 0 } as any)}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-red-800 focus:ring-2 focus:ring-red-800/20 outline-none" />
                       </div>
 
-                      {/* Preview do Valor recalculando em tempo real conforme as alterações */}
+                      {/* Preview do Valor de forma 100% segura contra erros do compilador de barras */}
                       <div className="col-span-2 bg-slate-50 rounded-lg p-3 text-sm text-slate-600">
-                        Valor calculado: <span className="font-semibold text-slate-800">
-                          {formatCurrency((editingRecord.litros || 0) * ((editingRecord as any).precoDiesel || dieselPrice.price))}
-                        </span>
-                        <span className="text-xs text-slate-400 ml-2">
-                          (Litros × {formatCurrency((editingRecord as any).precoDiesel || dieselPrice.price)}/L)
-                        </span>
+                        {`Valor calculado: ${formatCurrency(editingRecordValorCalculado)} (Litros × ${formatCurrency(editingRecordPreco)}/L)`}
                       </div>
+                    </div>
                     <div className="border-t border-slate-200 px-6 py-4 flex justify-end gap-3">
                       <button
                         onClick={() => setEditingRecord(null)}
@@ -3591,6 +3595,86 @@ return {
                   </button>
                 </div>
               </div>
+
+              {filteredEquipments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-[900px] w-full">
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">ID</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Equipamento</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Placa</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">CC Novo</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Gerência</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Área Lot.</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Área</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Fornecedor</th>
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase">Cadastrado em</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEquipments.map((eq) => (
+                        <tr key={eq.id} className="border-b border-slate-100 hover:bg-slate-50">
+                          <td className="py-3 px-4 text-sm text-red-800 font-medium">{eq.id}</td>
+                          <td className="py-3 px-4 text-sm text-slate-800 font-medium">{eq.equipment}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{eq.plate || '-'}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">
+                            <div className="flex flex-wrap gap-1">
+                              {eq.ccNovo.length > 0 ? (
+                                eq.ccNovo.map((cc) => (
+                                  <span key={cc} className="rounded bg-slate-100 px-2 py-0.5 text-xs">
+                                    {cc}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{eq.gerencia}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{eq.areaLotacao}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{eq.area}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{eq.fornecedor}</td>
+                          <td className="py-3 px-4 text-sm text-slate-500">
+                            {new Date(eq.createdAt).toLocaleDateString('pt-BR')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-12 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                    <Wrench className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <p className="text-slate-600 font-medium mb-1">
+                    {equipments.length === 0
+                      ? 'Nenhum equipamento cadastrado'
+                      : 'Nenhum equipamento encontrado com a busca'}
+                  </p>
+                  <p className="text-sm text-slate-400 mb-4">
+                    {equipments.length === 0
+                      ? 'Cadastre um novo equipamento na aba Equipamentos'
+                      : 'Tente ajustar o termo da busca'}
+                  </p>
+                  {equipments.length === 0 && (
+                    <button
+                      onClick={() => setCurrentPage('equipments')}
+                      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg inline-flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Novo Equipamento
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
               {filteredEquipments.length > 0 ? (
                 <div className="overflow-x-auto">
