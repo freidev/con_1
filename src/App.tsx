@@ -1494,49 +1494,14 @@ const handleDeleteBudget = async (budgetId: number) => {
     updatedBy: currentUser?.username || 'unknown',
   });
 
-  // 3. Recalcular o valor de todos os abastecimentos no banco
-  // (Busca todos e faz um UPDATE em massa)
-  const { data: absData, error: absError } = await supabase
-    .from('abastecimentos')
-    .select('id, litros');
-
-  if (!absError && absData && absData.length > 0) {
-    // Monta os registros atualizados
-    const updates = absData.map((a: any) => ({
-      id: a.id,
-      valor: Number(a.litros) * price,
-    }));
-
-    // Atualiza cada registro no banco
-    // Supabase não tem "bulk update" direto, então usamos upsert
-    const { error: upsertError } = await supabase
-      .from('abastecimentos')
-      .upsert(updates, { onConflict: 'id' });
-
-    if (upsertError) {
-      console.error('ERRO ao recalcular valores:', upsertError);
-      addNotification(
-        'warning',
-        'Preço atualizado, mas houve erro ao recalcular os abastecimentos.'
-      );
-    }
-  }
-
-  // 4. Recalcular na tela (estado local) para atualização imediata
-  setAbastecimentos(prev =>
-    prev.map(a => ({
-      ...a,
-      valor: a.litros * price,
-    }))
-  );
+  // O preço global agora serve apenas como valor padrão sugerido no preenchimento.
+  // Os registros já salvos mantêm o valor calculado com o preço que foi usado na hora.
 
   setNewDieselPrice('');
   addNotification(
     'success',
-    `Preço atualizado para ${formatCurrency(price)}! Dashboard recalculado.`
+    `Preço padrão atualizado para ${formatCurrency(price)}! Novos preenchimentos usarão este valor como sugestão.`
   );
-};
-
   // Import Excel
   const handleImportExcel = (data: any[][], fileName = '') => {
     const headerAliases: Record<string, string[]> = {
@@ -1764,10 +1729,13 @@ const handleDeleteBudget = async (budgetId: number) => {
 
   // Dashboard data
   const dashboardData = useMemo(() => {
-    const totalLitros = filteredAbastecimentos.reduce((sum, a) => sum + a.litros, 0);
+     const totalLitros = filteredAbastecimentos.reduce((sum, a) => sum + a.litros, 0);
     const totalValor = filteredAbastecimentos.reduce((sum, a) => sum + a.valor, 0);
     const mediaAbastecimento = filteredAbastecimentos.length > 0 ? totalLitros / filteredAbastecimentos.length : 0;
+    const mediaValor = filteredAbastecimentos.length > 0 ? totalValor / filteredAbastecimentos.length : 0;
     const maiorAbastecimento = filteredAbastecimentos.reduce((max, a) => a.litros > max ? a.litros : max, 0);
+    const recordMaiorAbastecimento = filteredAbastecimentos.find(a => a.litros === maiorAbastecimento);
+    const maiorAbastecimentoValor = recordMaiorAbastecimento?.valor || 0;
     
     // Consumption over time
     const consumoTempo = filteredAbastecimentos.reduce((acc, a) => {
@@ -1896,11 +1864,14 @@ const handleDeleteBudget = async (budgetId: number) => {
       };
     });
 
+   
     return {
       totalLitros,
       totalValor,
       mediaAbastecimento,
+      mediaValor,
       maiorAbastecimento,
+      maiorAbastecimentoValor,
       consumoTempo,
       consumoSemana,
       distribuicaoArea,
@@ -2792,7 +2763,7 @@ return {
             <div>
               <p className="text-sm text-slate-600">Valor Total (R$)</p>
               <p className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalValor)}</p>
-              <p className="text-xs text-slate-400">Preço: {formatCurrency(dieselPrice.price)}/L</p>
+              <p className="text-xs text-slate-400">{filteredAbastecimentos.length} registros</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
               <DollarSign className="w-5 h-5 text-amber-600" />
@@ -2805,7 +2776,7 @@ return {
             <div>
               <p className="text-sm text-slate-600">Média por Abastecimento</p>
               <p className="text-2xl font-bold text-slate-800">{formatLiters(dashboardData.mediaAbastecimento)}</p>
-              <p className="text-xs text-slate-400">{formatCurrency(dashboardData.mediaAbastecimento * dieselPrice.price)} em média</p>
+              <p className="text-xs text-slate-400">{formatCurrency(dashboardData.mediaValor)} em média</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-green-600" />
@@ -2818,15 +2789,14 @@ return {
             <div>
               <p className="text-sm text-slate-600">Maior Abastecimento</p>
               <p className="text-2xl font-bold text-slate-800">{formatLiters(dashboardData.maiorAbastecimento)}</p>
-              <p className="text-xs text-slate-400">{formatCurrency(dashboardData.maiorAbastecimento * dieselPrice.price)}</p>
+              <p className="text-xs text-slate-400">{formatCurrency(dashboardData.maiorAbastecimentoValor)}</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
               <Fuel className="w-5 h-5 text-red-600" />
             </div>
           </div>
         </div>
-      </div>
-
+        
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
